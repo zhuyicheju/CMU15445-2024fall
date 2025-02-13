@@ -13,6 +13,7 @@
 #pragma once
 
 #include <bitset>
+#include <cstddef>
 #include <memory>
 #include <mutex>  // NOLINT
 #include <sstream>
@@ -91,6 +92,7 @@ class HyperLogLogPresto {
   /** @brief Storing cardinality value */
   uint64_t cardinality_;
 
+  size_t nbits_;
   // TODO(student) - can add more data structures as required
 };
 

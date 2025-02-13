@@ -13,6 +13,7 @@
 #pragma once
 
 #include <bitset>
+#include <cstdint>
 #include <memory>
 #include <mutex>  // NOLINT
 #include <string>
@@ -72,6 +73,10 @@ class HyperLogLog {
   /** @brief Cardinality value. */
   size_t cardinality_;
 
+  int16_t nbits_;
+  std::vector<uint8_t> buckets_;
+  std::vector<std::mutex> lock_;
+  std::mutex cardinality_lock_;
   /** @todo (student) can add their data structures that support HyperLogLog */
 };
 
