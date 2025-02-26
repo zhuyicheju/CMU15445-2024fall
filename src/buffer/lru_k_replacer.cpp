@@ -48,11 +48,27 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
  */
 auto LRUKReplacer::Evict() -> std::optional<frame_id_t> { 
     std::optional<frame_id_t> frame = std::nullopt;
-    size_t k_timestrap = 0;
-    size_t lru_timestrap = 0;
+    size_t k_timestrap = 0x3f3f3f3f;
+    size_t lru_timestrap = 0x3f3f3f3f;
     for (auto& [current_frame, node] : node_store_){
-        if(node.is)
+        if(!node.is_evictable_){
+            continue;
+        }
+        auto distance = node.history_.back();
+        if(node.history_.size() < k_){
+            k_timestrap = 0;
+            if(lru_timestrap > distance){
+                lru_timestrap = distance;
+                frame = current_frame;
+            }
+        }else{
+            if(k_timestrap > distance){
+                k_timestrap = distance;
+                frame = current_frame;
+            }
+        }
     }
+    return frame;
  }
 
 /**
@@ -82,13 +98,17 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
       placeholder.fid_ = frame_id;
       placeholder.history_.emplace_front(timestrap);
       placeholder.k_ = k_;
-      iter->second = std::move(placeholder);
+      node_store_[frame_id] = std::move(placeholder);
     }else{
       iter->second.history_.emplace_front(timestrap);
-    }
-    if(iter->second.history_.size() > k_){
+      if(iter->second.history_.size() > k_){
         iter->second.history_.pop_back();
+      }
     }
+    // if(iter->second.history_.size() > k_){
+    //     iter->second.history_.pop_back();
+    // }
+    //former here
 }
 
 /**
