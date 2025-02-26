@@ -48,8 +48,8 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
  */
 auto LRUKReplacer::Evict() -> std::optional<frame_id_t> { 
     std::optional<frame_id_t> frame = std::nullopt;
-    size_t k_timestrap = 0x3f3f3f3f;
-    size_t lru_timestrap = 0x3f3f3f3f;
+    size_t k_timestrap = 0xffffffffff3f3f3f;
+    size_t lru_timestrap = 0xffffffffff3f3f3f;
     for (auto& [current_frame, node] : node_store_){
         if(!node.is_evictable_){
             continue;
@@ -67,6 +67,10 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
                 frame = current_frame;
             }
         }
+    }
+    if(frame.has_value()){
+        node_store_.erase(frame.value());
+        curr_size_--;
     }
     return frame;
  }
@@ -90,7 +94,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
     auto iter = node_store_.find(frame_id);
     auto now = std::chrono::system_clock::now();
     auto duration = now.time_since_epoch();
-    size_t timestrap = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+    size_t timestrap = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
 
     if(iter == node_store_.end()){
       auto placeholder = LRUKNode();
