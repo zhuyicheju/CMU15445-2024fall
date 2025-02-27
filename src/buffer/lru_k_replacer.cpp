@@ -68,6 +68,8 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
             }
         }
     }
+
+    //remove the frame after eviction
     if(frame.has_value()){
         node_store_.erase(frame.value());
         curr_size_--;
