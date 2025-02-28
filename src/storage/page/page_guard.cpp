@@ -28,8 +28,12 @@ namespace bustub {
  */
 ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame,
                              std::shared_ptr<LRUKReplacer> replacer, std::shared_ptr<std::mutex> bpm_latch)
-    : page_id_(page_id), frame_(std::move(frame)), replacer_(std::move(replacer)), bpm_latch_(std::move(bpm_latch)) {
-  UNIMPLEMENTED("TODO(P1): Add implementation.");
+    : page_id_(page_id), frame_(std::move(frame)), replacer_(std::move(replacer)),
+     bpm_latch_(std::move(bpm_latch)), read_lock_(frame_->rwlatch_)
+{
+  frame_->pin_count_++;
+  replacer_->SetEvictable(frame_->frame_id_, false);
+  bpm_latch_->unlock();
 }
 
 /**
@@ -103,7 +107,11 @@ auto ReadPageGuard::IsDirty() const -> bool {
  *
  * TODO(P1): Add implementation.
  */
-void ReadPageGuard::Drop() { UNIMPLEMENTED("TODO(P1): Add implementation."); }
+void ReadPageGuard::Drop() {
+  if(--frame_->pin_count_ == 0){
+    replacer_->SetEvictable(frame_->frame_id_, true);
+  }
+}
 
 /** @brief The destructor for `ReadPageGuard`. This destructor simply calls `Drop()`. */
 ReadPageGuard::~ReadPageGuard() { Drop(); }
@@ -126,8 +134,13 @@ ReadPageGuard::~ReadPageGuard() { Drop(); }
  */
 WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame,
                                std::shared_ptr<LRUKReplacer> replacer, std::shared_ptr<std::mutex> bpm_latch)
-    : page_id_(page_id), frame_(std::move(frame)), replacer_(std::move(replacer)), bpm_latch_(std::move(bpm_latch)) {
-  UNIMPLEMENTED("TODO(P1): Add implementation.");
+    : page_id_(page_id), frame_(std::move(frame)), replacer_(std::move(replacer)),
+     bpm_latch_(std::move(bpm_latch)), write_lock_(frame_->rwlatch_)
+                                        //获得写锁
+{
+  frame_->pin_count_ ++;
+  replacer->SetEvictable(frame_->frame_id_, false);
+  bpm_latch->unlock();
 }
 
 /**
@@ -209,7 +222,11 @@ auto WritePageGuard::IsDirty() const -> bool {
  *
  * TODO(P1): Add implementation.
  */
-void WritePageGuard::Drop() { UNIMPLEMENTED("TODO(P1): Add implementation."); }
+void WritePageGuard::Drop() { 
+  if(--frame_->pin_count_ == 0){
+    replacer_->SetEvictable(frame_->frame_id_, true);
+  }
+}
 
 /** @brief The destructor for `WritePageGuard`. This destructor simply calls `Drop()`. */
 WritePageGuard::~WritePageGuard() { Drop(); }

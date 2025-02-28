@@ -226,9 +226,9 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
 
   //如果缓冲区无请求页
   if(iter == page_table_.end()){
-    auto frame_iter = free_frames_.begin();
+    auto free_frame_iter = free_frames_.begin();
     //如果无空闲帧
-    if(frame_iter == free_frames_.end()){
+    if(free_frame_iter == free_frames_.end()){
       //使用lruk驱逐帧
       auto evict_frame = replacer_->Evict();
       if(!evict_frame.has_value()){
@@ -259,7 +259,8 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
       // }      
 
     }else{
-      frame_id = *frame_iter;
+      frame_id = *free_frame_iter;
+      free_frames_.erase(free_frame_iter);
     }
 
     //将请求帧写入缓冲区
