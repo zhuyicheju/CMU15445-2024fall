@@ -12,6 +12,7 @@
 
 #include "buffer/lru_k_replacer.h"
 #include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <optional>
 #include "common/config.h"

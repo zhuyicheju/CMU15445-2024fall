@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "storage/page/page_guard.h"
+#include <iterator>
+#include <utility>
 
 namespace bustub {
 
@@ -31,9 +33,11 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
     : page_id_(page_id), frame_(std::move(frame)), replacer_(std::move(replacer)),
      bpm_latch_(std::move(bpm_latch)), read_lock_(frame_->rwlatch_)
 {
-  frame_->pin_count_++;
+  bpm_latch_->lock();
+  frame_->pin_count_.fetch_add(1, std::memory_order_relaxed);
   replacer_->SetEvictable(frame_->frame_id_, false);
   bpm_latch_->unlock();
+  is_valid_ = true;
 }
 
 /**
@@ -51,7 +55,14 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
  *
  * @param that The other page guard.
  */
-ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {}
+ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {
+  page_id_ = that.page_id_;
+  frame_ = std::move(that.frame_);
+  replacer_ = std::move(that.replacer_);
+  bpm_latch_ = std::move(that.bpm_latch_);
+  is_valid_ = that.is_valid_;
+  read_lock_ = std::move(that.read_lock_);
+}
 
 /**
  * @brief The move assignment operator for `ReadPageGuard`.
@@ -108,7 +119,7 @@ auto ReadPageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void ReadPageGuard::Drop() {
-  if(--frame_->pin_count_ == 0){
+  if(frame_->pin_count_.fetch_sub(1) == 1){
     replacer_->SetEvictable(frame_->frame_id_, true);
   }
 }
@@ -138,10 +149,11 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
      bpm_latch_(std::move(bpm_latch)), write_lock_(frame_->rwlatch_)
                                         //获得写锁
 {
-  frame_->pin_count_ ++;
-  replacer->SetEvictable(frame_->frame_id_, false);
-  bpm_latch->unlock();
-  frame->is_dirty_ = true;
+  frame_->pin_count_.fetch_add(1, std::memory_order_relaxed);
+  replacer_->SetEvictable(frame_->frame_id_, false);
+  bpm_latch_->unlock();
+  frame_->is_dirty_ = true;
+  is_valid_ = true;
 }
 
 /**
@@ -159,7 +171,14 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
  *
  * @param that The other page guard.
  */
-WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {}
+WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {
+  page_id_ = that.page_id_;
+  frame_ = that.frame_;
+  replacer_ = that.replacer_;
+  bpm_latch_ = that.bpm_latch_;
+  is_valid_ = that.is_valid_;
+  write_lock_ = std::move(that.write_lock_);
+}
 
 /**
  * @brief The move assignment operator for `WritePageGuard`.
@@ -224,9 +243,13 @@ auto WritePageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void WritePageGuard::Drop() { 
-  if(--frame_->pin_count_ == 0){
+
+  bpm_latch_->lock();
+  frame_->pin_count_.fetch_sub(1);
+  if(frame_->pin_count_ == 0){
     replacer_->SetEvictable(frame_->frame_id_, true);
   }
+  bpm_latch_->unlock();
 }
 
 /** @brief The destructor for `WritePageGuard`. This destructor simply calls `Drop()`. */

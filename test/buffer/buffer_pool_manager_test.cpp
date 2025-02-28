@@ -44,7 +44,6 @@ TEST(BufferPoolManagerTest, VeryBasicTest) {
     snprintf(data, sizeof(str), "%s", str);
     EXPECT_STREQ(data, str);
   }
-
   // Check `ReadPageGuard` basic functionality.
   {
     auto guard = bpm->ReadPage(pid);
