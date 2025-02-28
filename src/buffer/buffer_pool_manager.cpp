@@ -122,7 +122,10 @@ auto BufferPoolManager::Size() const -> size_t { return num_frames_; }
  *
  * @return The page ID of the newly allocated page.
  */
-auto BufferPoolManager::NewPage() -> page_id_t { UNIMPLEMENTED("TODO(P1): Add implementation."); }
+auto BufferPoolManager::NewPage() -> page_id_t { 
+  disk_scheduler_->IncreaseDiskSpace(next_page_id_);
+  return next_page_id_++;
+}
 
 /**
  * @brief Removes a page from the database, both on disk and in memory.
@@ -150,7 +153,25 @@ auto BufferPoolManager::NewPage() -> page_id_t { UNIMPLEMENTED("TODO(P1): Add im
  * @param page_id The page ID of the page we want to delete.
  * @return `false` if the page exists but could not be deleted, `true` if the page didn't exist or deletion succeeded.
  */
-auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool { UNIMPLEMENTED("TODO(P1): Add implementation."); }
+auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool { 
+  auto iter = page_table_.find(page_id);
+  if(iter != page_table_.end()){
+    auto frame_id = iter->second;
+    auto frame = frames_[frame_id];
+    if(frame->pin_count_ != 0U){
+      return false;
+    }
+
+    replacer_->Remove(frame_id);
+
+    frames_[frame_id] = nullptr;
+    page_table_.erase(page_id);
+    free_frames_.push_back(frame_id);
+  }
+
+  return true;
+  //deallocate the fragmant of the disk; 
+}
 
 /**
  * @brief Acquires an optional write-locked guard over a page of data. The user can specify an `AccessType` if needed.
