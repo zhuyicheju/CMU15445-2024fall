@@ -14,6 +14,7 @@
 #include <optional>
 #include <type_traits>
 #include <utility>
+#include "common/config.h"
 #include "storage/page/page_guard.h"
 
 namespace bustub {
@@ -25,7 +26,7 @@ namespace bustub {
  *
  * @param frame_id The frame ID / index of the frame we are creating a header for.
  */
-FrameHeader::FrameHeader(frame_id_t frame_id) : frame_id_(frame_id), data_(BUSTUB_PAGE_SIZE, 0) { Reset(); }
+FrameHeader::FrameHeader(frame_id_t frame_id) : frame_id_(frame_id) { Reset(); }
 
 /**
  * @brief Get a raw const pointer to the frame's data.
@@ -45,6 +46,7 @@ auto FrameHeader::GetDataMut() -> char * { return data_.data(); }
  * @brief Resets a `FrameHeader`'s member fields.
  */
 void FrameHeader::Reset() {
+  data_.reserve(BUSTUB_PAGE_SIZE);
   std::fill(data_.begin(), data_.end(), 0);
   pin_count_.store(0);
   is_dirty_ = false;
@@ -127,8 +129,11 @@ auto BufferPoolManager::Size() const -> size_t { return num_frames_; }
  * @return The page ID of the newly allocated page.
  */
 auto BufferPoolManager::NewPage() -> page_id_t { 
-  disk_scheduler_->IncreaseDiskSpace(next_page_id_);
-  return next_page_id_++;
+  bpm_latch_->lock();
+  size_t nextpage = next_page_id_;
+  disk_scheduler_->IncreaseDiskSpace(next_page_id_++);
+  bpm_latch_->unlock();
+  return nextpage;
 }
 
 /**
@@ -241,25 +246,16 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
       if(frame_header->is_dirty_){
         auto promise = disk_scheduler_->CreatePromise();
         auto future = promise.get_future();
+        printf("%c\n",frame_header->data_[0]);
         disk_scheduler_->Schedule(DiskRequest(
           {true, frame_header->data_.data(), frame_header->page_id_,std::move(promise)}));
         if(!future.get()){
           return std::nullopt;
         }
       }
-
-      // //将请求帧写入缓冲区
-      // auto promise = disk_scheduler_->CreatePromise();
-      // auto future = promise.get_future();
-      // disk_scheduler_->Schedule(DiskRequest({
-      //   false, frame_header->data_.data(), page_id, std::move(promise)
-      // }));
-      // if(!future.get()){
-      //   return std::nullopt;
-      // }      
-
     }else{
       frame_id = *free_frame_iter;
+      frame_header = frames_[frame_id];
       free_frames_.erase(free_frame_iter);
     }
 
@@ -347,6 +343,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
 
     }else{
       frame_id = *free_frame_iter;
+      frame_header = frames_[frame_id];
       free_frames_.erase(free_frame_iter);
     }
 
