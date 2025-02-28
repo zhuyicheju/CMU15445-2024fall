@@ -72,6 +72,8 @@ class FrameHeader {
   /** @brief The frame ID / index of the frame this header represents. */
   const frame_id_t frame_id_;
 
+  page_id_t page_id_;
+
   /** @brief The readers / writer latch for this frame. */
   std::shared_mutex rwlatch_;
 

@@ -11,6 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/buffer_pool_manager.h"
+#include <optional>
+#include <type_traits>
+#include <utility>
+#include "storage/page/page_guard.h"
 
 namespace bustub {
 
@@ -154,11 +158,13 @@ auto BufferPoolManager::NewPage() -> page_id_t {
  * @return `false` if the page exists but could not be deleted, `true` if the page didn't exist or deletion succeeded.
  */
 auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool { 
+  bpm_latch_->lock();
   auto iter = page_table_.find(page_id);
   if(iter != page_table_.end()){
     auto frame_id = iter->second;
     auto frame = frames_[frame_id];
     if(frame->pin_count_ != 0U){
+      bpm_latch_->unlock();
       return false;
     }
 
@@ -168,7 +174,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
     page_table_.erase(page_id);
     free_frames_.push_back(frame_id);
   }
-
+  bpm_latch_->unlock();
   return true;
   //deallocate the fragmant of the disk; 
 }
@@ -213,7 +219,65 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
  * returns `std::nullopt`, otherwise returns a `WritePageGuard` ensuring exclusive and mutable access to a page's data.
  */
 auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_type) -> std::optional<WritePageGuard> {
-  UNIMPLEMENTED("TODO(P1): Add implementation.");
+  bpm_latch_->lock();
+  auto iter = page_table_.find(page_id);
+  auto frame_id = 0;
+  std::shared_ptr<FrameHeader> frame_header = nullptr;
+
+  //如果缓冲区无请求页
+  if(iter == page_table_.end()){
+    auto frame_iter = free_frames_.begin();
+    //如果无空闲帧
+    if(frame_iter == free_frames_.end()){
+      //使用lruk驱逐帧
+      auto evict_frame = replacer_->Evict();
+      if(!evict_frame.has_value()){
+        return std::nullopt;
+      }
+      frame_id = evict_frame.value();
+      frame_header = frames_[frame_id];
+
+      //将当前帧写入磁盘
+      if(frame_header->is_dirty_){
+        auto promise = disk_scheduler_->CreatePromise();
+        auto future = promise.get_future();
+        disk_scheduler_->Schedule(DiskRequest(
+          {true, frame_header->data_.data(), frame_header->page_id_,std::move(promise)}));
+        if(!future.get()){
+          return std::nullopt;
+        }
+      }
+
+      // //将请求帧写入缓冲区
+      // auto promise = disk_scheduler_->CreatePromise();
+      // auto future = promise.get_future();
+      // disk_scheduler_->Schedule(DiskRequest({
+      //   false, frame_header->data_.data(), page_id, std::move(promise)
+      // }));
+      // if(!future.get()){
+      //   return std::nullopt;
+      // }      
+
+    }else{
+      frame_id = *frame_iter;
+    }
+
+    //将请求帧写入缓冲区
+    auto promise = disk_scheduler_->CreatePromise();
+    auto future = promise.get_future();
+    disk_scheduler_->Schedule(DiskRequest({
+      false, frame_header->data_.data(), page_id, std::move(promise)
+    }));
+    replacer_->RecordAccess(frame_id, access_type);
+    if(!future.get()){
+      return std::nullopt;
+    }
+    
+  }else{
+    frame_id = iter->second;
+  }
+
+  return WritePageGuard(page_id, frame_header, replacer_, bpm_latch_);
 }
 
 /**
