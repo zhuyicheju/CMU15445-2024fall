@@ -34,7 +34,7 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
      bpm_latch_(std::move(bpm_latch)), read_lock_(frame_->rwlatch_)
 {
   bpm_latch_->lock();
-  frame_->pin_count_.fetch_add(1, std::memory_order_relaxed);
+  frame_->pin_count_.fetch_add(3, std::memory_order_relaxed);
   replacer_->SetEvictable(frame_->frame_id_, false);
   bpm_latch_->unlock();
   is_valid_ = true;
@@ -57,9 +57,9 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
  */
 ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {
   page_id_ = that.page_id_;
-  frame_ = std::move(that.frame_);
-  replacer_ = std::move(that.replacer_);
-  bpm_latch_ = std::move(that.bpm_latch_);
+  frame_ = that.frame_;
+  replacer_ = that.replacer_;
+  bpm_latch_ = that.bpm_latch_;
   is_valid_ = that.is_valid_;
   read_lock_ = std::move(that.read_lock_);
 }
@@ -149,7 +149,8 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
      bpm_latch_(std::move(bpm_latch)), write_lock_(frame_->rwlatch_)
                                         //获得写锁
 {
-  frame_->pin_count_.fetch_add(1, std::memory_order_relaxed);
+  bpm_latch_->lock();
+  frame_->pin_count_.fetch_add(3, std::memory_order_relaxed);
   replacer_->SetEvictable(frame_->frame_id_, false);
   bpm_latch_->unlock();
   frame_->is_dirty_ = true;

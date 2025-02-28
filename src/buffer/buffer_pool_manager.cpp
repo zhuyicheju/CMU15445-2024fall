@@ -354,7 +354,6 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
     disk_scheduler_->Schedule(DiskRequest({
       false, frame_header->data_.data(), page_id, std::move(promise)
     }));
-    replacer_->RecordAccess(frame_id, access_type);
     if(!future.get()){
       return std::nullopt;
     }
@@ -364,6 +363,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
   }
 
   replacer_->RecordAccess(frame_id, access_type);
+  bpm_latch_->unlock();
   return ReadPageGuard(page_id, frame_header, replacer_, bpm_latch_);
 }
 
@@ -383,6 +383,7 @@ auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_typ
  */
 auto BufferPoolManager::WritePage(page_id_t page_id, AccessType access_type) -> WritePageGuard {
   auto guard_opt = CheckedWritePage(page_id, access_type);
+  
   if (!guard_opt.has_value()) {
     fmt::println(stderr, "\n`CheckedWritePage` failed to bring in page {}\n", page_id);
     std::abort();
