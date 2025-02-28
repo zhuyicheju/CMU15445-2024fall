@@ -141,6 +141,7 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
   frame_->pin_count_ ++;
   replacer->SetEvictable(frame_->frame_id_, false);
   bpm_latch->unlock();
+  frame->is_dirty_ = true;
 }
 
 /**
