@@ -128,6 +128,11 @@ class BufferPoolManager {
   auto GetPinCount(page_id_t page_id) -> std::optional<size_t>;
 
  private:
+
+  auto AcquireFrameHeader(page_id_t page_id, AccessType access_type)
+        -> std::optional<std::shared_ptr<FrameHeader>>;
+
+
   /** @brief The number of frames in the buffer pool. */
   const size_t num_frames_;
 

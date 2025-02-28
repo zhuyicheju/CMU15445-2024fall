@@ -167,6 +167,8 @@ class WritePageGuard {
   ~WritePageGuard();
 
  private:
+
+
   /** @brief Only the buffer pool manager is allowed to construct a valid `WritePageGuard.` */
   explicit WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame, std::shared_ptr<LRUKReplacer> replacer,
                           std::shared_ptr<std::mutex> bpm_latch);

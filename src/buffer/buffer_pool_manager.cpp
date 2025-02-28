@@ -12,9 +12,11 @@
 
 #include "buffer/buffer_pool_manager.h"
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
+#include "buffer/lru_k_replacer.h"
 #include "common/config.h"
 #include "storage/page/page_guard.h"
 
@@ -185,46 +187,9 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
   //deallocate the fragmant of the disk; 
 }
 
-/**
- * @brief Acquires an optional write-locked guard over a page of data. The user can specify an `AccessType` if needed.
- *
- * If it is not possible to bring the page of data into memory, this function will return a `std::nullopt`.
- *
- * Page data can _only_ be accessed via page guards. Users of this `BufferPoolManager` are expected to acquire either a
- * `ReadPageGuard` or a `WritePageGuard` depending on the mode in which they would like to access the data, which
- * ensures that any access of data is thread-safe.
- *
- * There can only be 1 `WritePageGuard` reading/writing a page at a time. This allows data access to be both immutable
- * and mutable, meaning the thread that owns the `WritePageGuard` is allowed to manipulate the page's data however they
- * want. If a user wants to have multiple threads reading the page at the same time, they must acquire a `ReadPageGuard`
- * with `CheckedReadPage` instead.
- *
- * ### Implementation
- *
- * There are 3 main cases that you will have to implement. The first two are relatively simple: one is when there is
- * plenty of available memory, and the other is when we don't actually need to perform any additional I/O. Think about
- * what exactly these two cases entail.
- *
- * The third case is the trickiest, and it is when we do not have any _easily_ available memory at our disposal. The
- * buffer pool is tasked with finding memory that it can use to bring in a page of memory, using the replacement
- * algorithm you implemented previously to find candidate frames for eviction.
- *
- * Once the buffer pool has identified a frame for eviction, several I/O operations may be necessary to bring in the
- * page of data we want into the frame.
- *
- * There is likely going to be a lot of shared code with `CheckedReadPage`, so you may find creating helper functions
- * useful.
- *
- * These two functions are the crux of this project, so we won't give you more hints than this. Good luck!
- *
- * TODO(P1): Add implementation.
- *
- * @param page_id The ID of the page we want to write to.
- * @param access_type The type of page access.
- * @return std::optional<WritePageGuard> An optional latch guard where if there are no more free frames (out of memory)
- * returns `std::nullopt`, otherwise returns a `WritePageGuard` ensuring exclusive and mutable access to a page's data.
- */
-auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_type) -> std::optional<WritePageGuard> {
+auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_type)
+-> std::optional<std::shared_ptr<FrameHeader>>
+{
   bpm_latch_->lock();
   auto iter = page_table_.find(page_id);
   auto frame_id = 0;
@@ -270,12 +235,65 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
       return std::nullopt;
     }
     
+    //对数据更新
+    page_table_[page_id] = frame_id;
+    frame_header->page_id_ = page_id;
+    
+
   }else{
     frame_id = iter->second;
+    frame_header = frames_[frame_id];
   }
   replacer_->RecordAccess(frame_id, access_type);
   bpm_latch_->unlock();
-  return WritePageGuard(page_id, frame_header, replacer_, bpm_latch_);
+  return frame_header;
+}
+
+/**
+ * @brief Acquires an optional write-locked guard over a page of data. The user can specify an `AccessType` if needed.
+ *
+ * If it is not possible to bring the page of data into memory, this function will return a `std::nullopt`.
+ *
+ * Page data can _only_ be accessed via page guards. Users of this `BufferPoolManager` are expected to acquire either a
+ * `ReadPageGuard` or a `WritePageGuard` depending on the mode in which they would like to access the data, which
+ * ensures that any access of data is thread-safe.
+ *
+ * There can only be 1 `WritePageGuard` reading/writing a page at a time. This allows data access to be both immutable
+ * and mutable, meaning the thread that owns the `WritePageGuard` is allowed to manipulate the page's data however they
+ * want. If a user wants to have multiple threads reading the page at the same time, they must acquire a `ReadPageGuard`
+ * with `CheckedReadPage` instead.
+ *
+ * ### Implementation
+ *
+ * There are 3 main cases that you will have to implement. The first two are relatively simple: one is when there is
+ * plenty of available memory, and the other is when we don't actually need to perform any additional I/O. Think about
+ * what exactly these two cases entail.
+ *
+ * The third case is the trickiest, and it is when we do not have any _easily_ available memory at our disposal. The
+ * buffer pool is tasked with finding memory that it can use to bring in a page of memory, using the replacement
+ * algorithm you implemented previously to find candidate frames for eviction.
+ *
+ * Once the buffer pool has identified a frame for eviction, several I/O operations may be necessary to bring in the
+ * page of data we want into the frame.
+ *
+ * There is likely going to be a lot of shared code with `CheckedReadPage`, so you may find creating helper functions
+ * useful.
+ *
+ * These two functions are the crux of this project, so we won't give you more hints than this. Good luck!
+ *
+ * TODO(P1): Add implementation.
+ *
+ * @param page_id The ID of the page we want to write to.
+ * @param access_type The type of page access.
+ * @return std::optional<WritePageGuard> An optional latch guard where if there are no more free frames (out of memory)
+ * returns `std::nullopt`, otherwise returns a `WritePageGuard` ensuring exclusive and mutable access to a page's data.
+ */
+auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_type) -> std::optional<WritePageGuard> {
+  auto frame_header = AcquireFrameHeader(page_id, access_type);
+  if(!frame_header.has_value()){
+    return std::nullopt;
+  }
+  return WritePageGuard(page_id, frame_header.value(), replacer_, bpm_latch_);
 }
 
 /**
@@ -303,68 +321,11 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
  * returns `std::nullopt`, otherwise returns a `ReadPageGuard` ensuring shared and read-only access to a page's data.
  */
 auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_type) -> std::optional<ReadPageGuard> {
-  bpm_latch_->lock();
-  auto iter = page_table_.find(page_id);
-  auto frame_id = 0;
-  std::shared_ptr<FrameHeader> frame_header = nullptr;
-
-  //如果缓冲区无请求页
-  if(iter == page_table_.end()){
-    auto free_frame_iter = free_frames_.begin();
-    //如果无空闲帧
-    if(free_frame_iter == free_frames_.end()){
-      //使用lruk驱逐帧
-      auto evict_frame = replacer_->Evict();
-      if(!evict_frame.has_value()){
-        return std::nullopt;
-      }
-      frame_id = evict_frame.value();
-      frame_header = frames_[frame_id];
-
-      //将当前帧写入磁盘
-      if(frame_header->is_dirty_){
-        auto promise = disk_scheduler_->CreatePromise();
-        auto future = promise.get_future();
-        disk_scheduler_->Schedule(DiskRequest(
-          {true, frame_header->data_.data(), frame_header->page_id_,std::move(promise)}));
-        if(!future.get()){
-          return std::nullopt;
-        }
-      }
-
-      // //将请求帧写入缓冲区
-      // auto promise = disk_scheduler_->CreatePromise();
-      // auto future = promise.get_future();
-      // disk_scheduler_->Schedule(DiskRequest({
-      //   false, frame_header->data_.data(), page_id, std::move(promise)
-      // }));
-      // if(!future.get()){
-      //   return std::nullopt;
-      // }      
-
-    }else{
-      frame_id = *free_frame_iter;
-      frame_header = frames_[frame_id];
-      free_frames_.erase(free_frame_iter);
-    }
-
-    //将请求帧写入缓冲区
-    auto promise = disk_scheduler_->CreatePromise();
-    auto future = promise.get_future();
-    disk_scheduler_->Schedule(DiskRequest({
-      false, frame_header->data_.data(), page_id, std::move(promise)
-    }));
-    if(!future.get()){
-      return std::nullopt;
-    }
-    
-  }else{
-    frame_id = iter->second;
+  auto frame_header = AcquireFrameHeader(page_id, access_type);
+  if(!frame_header.has_value()){
+    return std::nullopt;
   }
-
-  replacer_->RecordAccess(frame_id, access_type);
-  bpm_latch_->unlock();
-  return ReadPageGuard(page_id, frame_header, replacer_, bpm_latch_);
+  return ReadPageGuard(page_id, frame_header.value(), replacer_, bpm_latch_);
 }
 
 /**
