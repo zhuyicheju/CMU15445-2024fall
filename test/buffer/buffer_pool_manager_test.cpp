@@ -83,6 +83,7 @@ TEST(BufferPoolManagerTest, PagePinEasyTest) {
 
     ASSERT_EQ(1, bpm->GetPinCount(pageid0));
     ASSERT_EQ(1, bpm->GetPinCount(pageid1));
+  std::cout<<111<<std::endl;
 
     page_id_t temp_page_id1 = bpm->NewPage();
     auto temp_page1_opt = bpm->CheckedReadPage(temp_page_id1);
@@ -100,7 +101,6 @@ TEST(BufferPoolManagerTest, PagePinEasyTest) {
     page1_write.Drop();
     ASSERT_EQ(0, bpm->GetPinCount(pageid0));
   }
-
   {
     page_id_t temp_page_id1 = bpm->NewPage();
     auto temp_page1_opt = bpm->CheckedReadPage(temp_page_id1);

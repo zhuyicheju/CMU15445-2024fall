@@ -219,6 +219,9 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
           return std::nullopt;
         }
       }
+      page_table_.erase(frame_id);
+      //删除驱逐的数据
+
     }else{
       frame_id = *free_frame_iter;
       frame_header = frames_[frame_id];

@@ -34,7 +34,7 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
      bpm_latch_(std::move(bpm_latch)), read_lock_(frame_->rwlatch_)
 {
   bpm_latch_->lock();
-  frame_->pin_count_.fetch_add(3, std::memory_order_relaxed);
+  frame_->pin_count_.fetch_add(1, std::memory_order_relaxed);
   replacer_->SetEvictable(frame_->frame_id_, false);
   bpm_latch_->unlock();
   is_valid_ = true;
@@ -62,6 +62,7 @@ ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {
   bpm_latch_ = that.bpm_latch_;
   is_valid_ = that.is_valid_;
   read_lock_ = std::move(that.read_lock_);
+  that.is_copy_ = true;
 }
 
 /**
@@ -119,9 +120,11 @@ auto ReadPageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void ReadPageGuard::Drop() {
-  if(frame_->pin_count_.fetch_sub(1) == 1){
+
+  if(!is_copy_&&frame_->pin_count_.fetch_sub(1) == 1){
     replacer_->SetEvictable(frame_->frame_id_, true);
   }
+
 }
 
 /** @brief The destructor for `ReadPageGuard`. This destructor simply calls `Drop()`. */
@@ -150,7 +153,7 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
                                         //获得写锁
 {
   bpm_latch_->lock();
-  frame_->pin_count_.fetch_add(3, std::memory_order_relaxed);
+  frame_->pin_count_.fetch_add(1, std::memory_order_relaxed);
   replacer_->SetEvictable(frame_->frame_id_, false);
   bpm_latch_->unlock();
   frame_->is_dirty_ = true;
@@ -179,6 +182,8 @@ WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {
   bpm_latch_ = that.bpm_latch_;
   is_valid_ = that.is_valid_;
   write_lock_ = std::move(that.write_lock_);
+  that.is_copy_ = true;
+
 }
 
 /**
@@ -244,13 +249,9 @@ auto WritePageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void WritePageGuard::Drop() { 
-
-  bpm_latch_->lock();
-  frame_->pin_count_.fetch_sub(1);
-  if(frame_->pin_count_ == 0){
+  if(!is_copy_&&frame_->pin_count_.fetch_sub(1) == 1){
     replacer_->SetEvictable(frame_->frame_id_, true);
   }
-  bpm_latch_->unlock();
 }
 
 /** @brief The destructor for `WritePageGuard`. This destructor simply calls `Drop()`. */
