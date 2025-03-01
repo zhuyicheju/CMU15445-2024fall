@@ -36,7 +36,6 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
 {
   bpm_latch_->lock();
   frame_->pin_count_.fetch_add(1);
-  cout<<"count"<<frame_->pin_count_<<endl;
   replacer_->SetEvictable(frame_->frame_id_, false);
   bpm_latch_->unlock();
   is_valid_ = true;
@@ -129,8 +128,7 @@ void ReadPageGuard::Drop() {
     if(frame_->pin_count_.fetch_sub(1) == 1){
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
-  }else{
-    cout<<frame_->pin_count_<<endl;
+    read_lock_.unlock();
   }
 
 }
@@ -161,7 +159,6 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
                                         //获得写锁
 {
   frame_->pin_count_.fetch_add(1);
-  cout<<"countwrite"<<frame_->pin_count_<<endl;
   replacer_->SetEvictable(frame_->frame_id_, false);
   frame_->is_dirty_ = true;
   is_valid_ = true;
@@ -261,10 +258,7 @@ void WritePageGuard::Drop() {
     if(frame_->pin_count_.fetch_sub(1) == 1){
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
-  }else{
-    if(!is_copy_){
-      cout<<frame_->pin_count_<<endl;
-    }
+    write_lock_.unlock();
   }
 }
 

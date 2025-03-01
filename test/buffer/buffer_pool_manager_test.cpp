@@ -27,7 +27,7 @@ const size_t FRAMES = 10;
 // Note that this test assumes you are using the an LRU-K replacement policy.
 const size_t K_DIST = 5;
 
-TEST(BufferPoolManagerTest, DISABLED_VeryBasicTest) {
+TEST(BufferPoolManagerTest, VeryBasicTest) {
   // A very basic test.
 
   auto disk_manager = std::make_shared<DiskManager>(db_fname);
@@ -155,7 +155,7 @@ TEST(BufferPoolManagerTest, PagePinEasyTest) {
   remove(disk_manager->GetLogFileName());
 }
 
-TEST(BufferPoolManagerTest, DISABLED_PagePinMediumTest) {
+TEST(BufferPoolManagerTest, PagePinMediumTest) {
   auto disk_manager = std::make_shared<DiskManager>(db_fname);
   auto bpm = std::make_shared<BufferPoolManager>(FRAMES, disk_manager.get(), K_DIST);
 
