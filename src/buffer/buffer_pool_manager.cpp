@@ -178,7 +178,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
 
     replacer_->Remove(frame_id);
 
-    //frames_[frame_id] = nullptr;
+    // frames_[frame_id] = nullptr;
     page_table_.erase(page_id);
     free_frames_.push_back(frame_id);
   }
@@ -215,6 +215,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
         if (!future.get()) {
           return std::nullopt;
         }
+        frame_header->is_dirty_ = false;
       }
       page_table_.erase(frame_header->page_id_);
       //删除驱逐的数据
@@ -411,7 +412,7 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
     }
     frame_header->is_dirty_ = false;
   }
-  //replacer_->Remove(frame_id);
+  // replacer_->Remove(frame_id);
 
   return true;
 }
@@ -436,7 +437,7 @@ void BufferPoolManager::FlushAllPages() {
       future.get();
       frame_header->is_dirty_ = false;
     }
-    //replacer_->Remove(frame_header->frame_id_);
+    // replacer_->Remove(frame_header->frame_id_);
   }
 }
 

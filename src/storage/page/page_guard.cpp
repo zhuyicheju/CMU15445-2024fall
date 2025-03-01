@@ -60,9 +60,9 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
  */
 ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {
   page_id_ = that.page_id_;
-  frame_ = that.frame_;
-  replacer_ = that.replacer_;
-  bpm_latch_ = that.bpm_latch_;
+  frame_ = std::move(that.frame_);
+  replacer_ = std::move(that.replacer_);
+  bpm_latch_ = std::move(that.bpm_latch_);
   is_valid_ = that.is_valid_;
   read_lock_ = std::move(that.read_lock_);
   that.is_copy_ = true;
@@ -92,9 +92,9 @@ auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & 
   }
   this->Drop();
   page_id_ = that.page_id_;
-  frame_ = that.frame_;
-  replacer_ = that.replacer_;
-  bpm_latch_ = that.bpm_latch_;
+  frame_ = std::move(that.frame_);
+  replacer_ = std::move(that.replacer_);
+  bpm_latch_ = std::move(that.bpm_latch_);
   is_valid_ = that.is_valid_;
   read_lock_ = std::move(that.read_lock_);
   is_copy_ = false;
@@ -142,6 +142,7 @@ auto ReadPageGuard::IsDirty() const -> bool {
 void ReadPageGuard::Drop() {
   if (!is_copy_ && !is_drop_) {
     is_drop_ = true;
+    std::lock_guard<std::mutex> lock(*bpm_latch_);
     if (frame_->pin_count_.fetch_sub(1) == 1) {
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
@@ -202,9 +203,9 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
  */
 WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {
   page_id_ = that.page_id_;
-  frame_ = that.frame_;
-  replacer_ = that.replacer_;
-  bpm_latch_ = that.bpm_latch_;
+  frame_ = std::move(that.frame_);
+  replacer_ = std::move(that.replacer_);
+  bpm_latch_ = std::move(that.bpm_latch_);
   is_valid_ = that.is_valid_;
   write_lock_ = std::move(that.write_lock_);
   that.is_copy_ = true;
@@ -234,9 +235,9 @@ auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard
   }
   this->Drop();
   page_id_ = that.page_id_;
-  frame_ = that.frame_;
-  replacer_ = that.replacer_;
-  bpm_latch_ = that.bpm_latch_;
+  frame_ = std::move(that.frame_);
+  replacer_ = std::move(that.replacer_);
+  bpm_latch_ = std::move(that.bpm_latch_);
   is_valid_ = that.is_valid_;
   write_lock_ = std::move(that.write_lock_);
   is_copy_ = false;
@@ -294,6 +295,7 @@ void WritePageGuard::Drop() {
   // cout<<is_copy_<<' '<<is_drop_<<endl;
   if (!is_copy_ && !is_drop_) {
     is_drop_ = true;
+    std::lock_guard<std::mutex> lock(*bpm_latch_);
     if (frame_->pin_count_.fetch_sub(1) == 1) {
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
