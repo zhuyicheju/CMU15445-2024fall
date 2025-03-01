@@ -85,14 +85,16 @@ ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {
  * @return ReadPageGuard& The newly valid `ReadPageGuard`.
  */
 auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & { 
+  this->Drop();
   page_id_ = that.page_id_;
   frame_ = that.frame_;
   replacer_ = that.replacer_;
   bpm_latch_ = that.bpm_latch_;
   is_valid_ = that.is_valid_;
   read_lock_ = std::move(that.read_lock_);
-  that.is_copy_ = true;
   is_copy_ = false;
+  that.is_copy_ = true;
+  //cout<<page_id_<<" "<<this->is_copy_<<' '<<that.is_copy_<<endl;
   is_drop_ = that.is_drop_;
   return *this; 
 }
@@ -219,6 +221,7 @@ WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {
  * @return WritePageGuard& The newly valid `WritePageGuard`.
  */
 auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & { 
+  this->Drop();
   page_id_ = that.page_id_;
   frame_ = that.frame_;
   replacer_ = that.replacer_;
@@ -227,7 +230,7 @@ auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard
   write_lock_ = std::move(that.write_lock_);
   is_copy_ = false;
   that.is_copy_ = true;
-  cout<<page_id_<<" "<<this->is_copy_<<' '<<that.is_copy_<<endl;
+  //cout<<page_id_<<" "<<this->is_copy_<<' '<<that.is_copy_<<endl;
   is_drop_ = that.is_drop_;
   return *this; 
 }
@@ -276,7 +279,7 @@ auto WritePageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void WritePageGuard::Drop() { 
-  cout<<"xigou"<<page_id_<<" "<<this->is_copy_<<endl;
+  //cout<<"xigou"<<page_id_<<" "<<this->is_copy_<<endl;
   //cout<<is_copy_<<' '<<is_drop_<<endl;
   if(!is_copy_ && !is_drop_){
     is_drop_ = true;

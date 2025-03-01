@@ -174,7 +174,6 @@ TEST(BufferPoolManagerTest, PagePinMediumTest) {
 
   // Scenario: We should be able to create new pages until we fill up the buffer pool.
   for (size_t i = 0; i < FRAMES; i++) {
-  cout<<"aaaass"<<endl;
     auto pid = bpm->NewPage();
     auto page = bpm->WritePage(pid);
     pages.push_back(std::move(page));
@@ -196,7 +195,6 @@ TEST(BufferPoolManagerTest, PagePinMediumTest) {
   // Scenario: Drop the first 5 pages to unpin them.
   for (size_t i = 0; i < FRAMES / 2; i++) {
     page_id_t pid = pages[0].GetPageId();
-  cout<<"bsdasds"<<pid<<endl;
     EXPECT_EQ(1, bpm->GetPinCount(pid));
     pages.erase(pages.begin());
     EXPECT_EQ(0, bpm->GetPinCount(pid));
