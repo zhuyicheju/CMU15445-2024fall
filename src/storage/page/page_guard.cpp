@@ -13,6 +13,7 @@
 #include "storage/page/page_guard.h"
 #include <iterator>
 #include <utility>
+using std::cout, std::endl;
 
 namespace bustub {
 
@@ -34,7 +35,8 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
      bpm_latch_(std::move(bpm_latch)), read_lock_(frame_->rwlatch_)
 {
   bpm_latch_->lock();
-  frame_->pin_count_.fetch_add(1, std::memory_order_relaxed);
+  frame_->pin_count_.fetch_add(1);
+  cout<<"count"<<frame_->pin_count_<<endl;
   replacer_->SetEvictable(frame_->frame_id_, false);
   bpm_latch_->unlock();
   is_valid_ = true;
@@ -63,6 +65,7 @@ ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {
   is_valid_ = that.is_valid_;
   read_lock_ = std::move(that.read_lock_);
   that.is_copy_ = true;
+  is_drop_ = that.is_drop_;
 }
 
 /**
@@ -121,8 +124,13 @@ auto ReadPageGuard::IsDirty() const -> bool {
  */
 void ReadPageGuard::Drop() {
 
-  if(!is_copy_&&frame_->pin_count_.fetch_sub(1) == 1){
-    replacer_->SetEvictable(frame_->frame_id_, true);
+  if(!is_copy_ && !is_drop_){
+    is_drop_ = true;
+    if(frame_->pin_count_.fetch_sub(1) == 1){
+      replacer_->SetEvictable(frame_->frame_id_, true);
+    }
+  }else{
+    cout<<frame_->pin_count_<<endl;
   }
 
 }
@@ -152,10 +160,9 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
      bpm_latch_(std::move(bpm_latch)), write_lock_(frame_->rwlatch_)
                                         //获得写锁
 {
-  bpm_latch_->lock();
-  frame_->pin_count_.fetch_add(1, std::memory_order_relaxed);
+  frame_->pin_count_.fetch_add(1);
+  cout<<"countwrite"<<frame_->pin_count_<<endl;
   replacer_->SetEvictable(frame_->frame_id_, false);
-  bpm_latch_->unlock();
   frame_->is_dirty_ = true;
   is_valid_ = true;
 }
@@ -183,7 +190,7 @@ WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {
   is_valid_ = that.is_valid_;
   write_lock_ = std::move(that.write_lock_);
   that.is_copy_ = true;
-
+  is_drop_ = that.is_drop_;
 }
 
 /**
@@ -249,8 +256,15 @@ auto WritePageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void WritePageGuard::Drop() { 
-  if(!is_copy_&&frame_->pin_count_.fetch_sub(1) == 1){
-    replacer_->SetEvictable(frame_->frame_id_, true);
+  if(!is_copy_ && !is_drop_){
+    is_drop_ = true;
+    if(frame_->pin_count_.fetch_sub(1) == 1){
+      replacer_->SetEvictable(frame_->frame_id_, true);
+    }
+  }else{
+    if(!is_copy_){
+      cout<<frame_->pin_count_<<endl;
+    }
   }
 }
 

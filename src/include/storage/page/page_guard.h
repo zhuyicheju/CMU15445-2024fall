@@ -117,6 +117,7 @@ class ReadPageGuard {
 
    std::shared_lock<std::shared_mutex> read_lock_;
    bool is_copy_{false};
+   bool is_drop_{false};
 };
 
 /**
@@ -222,6 +223,7 @@ class WritePageGuard {
    std::unique_lock<std::shared_mutex> write_lock_;
 
    bool is_copy_{false};
+   bool is_drop_{false};
 };
 
 }  // namespace bustub

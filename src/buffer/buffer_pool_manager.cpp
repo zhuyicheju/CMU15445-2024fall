@@ -192,7 +192,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
 auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_type)
 -> std::optional<std::shared_ptr<FrameHeader>>
 {
-  bpm_latch_->lock();
+  std::lock_guard<std::mutex> lock(*bpm_latch_);
   auto iter = page_table_.find(page_id);
   auto frame_id = 0;
   std::shared_ptr<FrameHeader> frame_header = nullptr;
@@ -205,7 +205,6 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
       //使用lruk驱逐帧
       auto evict_frame = replacer_->Evict();
       if(!evict_frame.has_value()){
-        bpm_latch_->unlock();
         return std::nullopt;
       }
       frame_id = evict_frame.value();
@@ -215,11 +214,9 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
       if(frame_header->is_dirty_){
         auto promise = disk_scheduler_->CreatePromise();
         auto future = promise.get_future();
-        printf("%c\n",frame_header->data_[0]);
         disk_scheduler_->Schedule(DiskRequest(
           {true, frame_header->data_.data(), frame_header->page_id_,std::move(promise)}));
         if(!future.get()){
-          bpm_latch_->unlock();
           return std::nullopt;
         }
       }
@@ -239,7 +236,6 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
       false, frame_header->data_.data(), page_id, std::move(promise)
     }));
     if(!future.get()){
-      bpm_latch_->unlock();
       return std::nullopt;
     }
     
@@ -252,8 +248,9 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
     frame_id = iter->second;
     frame_header = frames_[frame_id];
   }
+
   replacer_->RecordAccess(frame_id, access_type);
-  bpm_latch_->unlock();
+  replacer_->SetEvictable(frame_header->frame_id_, false);
   return frame_header;
 }
 
@@ -419,6 +416,7 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
       return false;
     }
   } 
+  replacer_->Remove(frame_id);
 
   return true;
 }
@@ -441,7 +439,8 @@ void BufferPoolManager::FlushAllPages() {
       disk_scheduler_->Schedule(DiskRequest(
         {true, frame_header->data_.data(), frame_header->page_id_,std::move(promise)}));
       future.get();
-    } 
+    }
+    replacer_->Remove(frame_header->frame_id_);
   }
 }
 
