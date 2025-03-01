@@ -85,6 +85,9 @@ ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {
  * @return ReadPageGuard& The newly valid `ReadPageGuard`.
  */
 auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & { 
+  if(&that == this){
+    return *this;
+  }
   this->Drop();
   page_id_ = that.page_id_;
   frame_ = that.frame_;
@@ -223,6 +226,9 @@ WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {
  * @return WritePageGuard& The newly valid `WritePageGuard`.
  */
 auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & { 
+  if(&that == this){
+    return *this;
+  }
   this->Drop();
   page_id_ = that.page_id_;
   frame_ = that.frame_;

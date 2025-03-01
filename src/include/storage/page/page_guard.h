@@ -65,6 +65,7 @@ class ReadPageGuard {
   void Drop();
   ~ReadPageGuard();
 
+   bool is_copy_{false};
  private:
   /** @brief Only the buffer pool manager is allowed to construct a valid `ReadPageGuard.` */
   explicit ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame, std::shared_ptr<LRUKReplacer> replacer,
@@ -116,7 +117,6 @@ class ReadPageGuard {
    */
 
    std::shared_lock<std::shared_mutex> read_lock_;
-   bool is_copy_{false};
    bool is_drop_{false};
 };
 
@@ -168,6 +168,7 @@ class WritePageGuard {
   void Drop();
   ~WritePageGuard();
 
+   bool is_copy_{false};
  private:
 
 
@@ -222,7 +223,6 @@ class WritePageGuard {
 
    std::unique_lock<std::shared_mutex> write_lock_;
 
-   bool is_copy_{false};
    bool is_drop_{false};
 };
 
