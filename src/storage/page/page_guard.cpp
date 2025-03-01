@@ -142,7 +142,6 @@ void ReadPageGuard::Drop() {
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
     read_lock_.unlock();
-    cout<<replacer_->Size()<<endl;
   }
 
 }
@@ -290,7 +289,6 @@ void WritePageGuard::Drop() {
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
     write_lock_.unlock();
-    cout<<replacer_->Size()<<endl;
   }
 }
 

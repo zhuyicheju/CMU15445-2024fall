@@ -209,7 +209,6 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
       }
       frame_id = evict_frame.value();
       frame_header = frames_[frame_id];
-      cout<<"pageid"<<frame_header->page_id_<<endl;
 
       //将当前帧写入磁盘
       if(frame_header->is_dirty_){
