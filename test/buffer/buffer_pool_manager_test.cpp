@@ -86,7 +86,7 @@ TEST(BufferPoolManagerTest, PagePinEasyTest) {
     page_id_t temp_page_id1 = bpm->NewPage();
     auto temp_page1_opt = bpm->CheckedReadPage(temp_page_id1);
     ASSERT_FALSE(temp_page1_opt.has_value());
-    
+
     page_id_t temp_page_id2 = bpm->NewPage();
     auto temp_page2_opt = bpm->CheckedWritePage(temp_page_id2);
 
@@ -162,7 +162,6 @@ TEST(BufferPoolManagerTest, PagePinMediumTest) {
   // Scenario: The buffer pool is empty. We should be able to create a new page.
   page_id_t pid0 = bpm->NewPage();
   auto page0 = bpm->WritePage(pid0);
-  cout<<"aaaaaaa"<<pid0<<endl;
 
   // Scenario: Once we have a page, we should be able to read and write content.
   snprintf(page0.GetDataMut(), BUSTUB_PAGE_SIZE, "Hello");

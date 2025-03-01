@@ -65,7 +65,8 @@ class ReadPageGuard {
   void Drop();
   ~ReadPageGuard();
 
-   bool is_copy_{false};
+  bool is_copy_{false};
+
  private:
   /** @brief Only the buffer pool manager is allowed to construct a valid `ReadPageGuard.` */
   explicit ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame, std::shared_ptr<LRUKReplacer> replacer,
@@ -116,8 +117,8 @@ class ReadPageGuard {
    * `std::shared_lock` type and use that for the latching mechanism instead of manually calling `lock` and `unlock`.
    */
 
-   std::shared_lock<std::shared_mutex> read_lock_;
-   bool is_drop_{false};
+  std::shared_lock<std::shared_mutex> read_lock_;
+  bool is_drop_{false};
 };
 
 /**
@@ -168,10 +169,9 @@ class WritePageGuard {
   void Drop();
   ~WritePageGuard();
 
-   bool is_copy_{false};
+  bool is_copy_{false};
+
  private:
-
-
   /** @brief Only the buffer pool manager is allowed to construct a valid `WritePageGuard.` */
   explicit WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame, std::shared_ptr<LRUKReplacer> replacer,
                           std::shared_ptr<std::mutex> bpm_latch);
@@ -221,9 +221,9 @@ class WritePageGuard {
    * `std::unique_lock` type and use that for the latching mechanism instead of manually calling `lock` and `unlock`.
    */
 
-   std::unique_lock<std::shared_mutex> write_lock_;
+  std::unique_lock<std::shared_mutex> write_lock_;
 
-   bool is_drop_{false};
+  bool is_drop_{false};
 };
 
 }  // namespace bustub

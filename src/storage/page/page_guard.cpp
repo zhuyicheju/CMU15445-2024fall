@@ -31,9 +31,11 @@ namespace bustub {
  */
 ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame,
                              std::shared_ptr<LRUKReplacer> replacer, std::shared_ptr<std::mutex> bpm_latch)
-    : page_id_(page_id), frame_(std::move(frame)), replacer_(std::move(replacer)),
-     bpm_latch_(std::move(bpm_latch)), read_lock_(frame_->rwlatch_)
-{
+    : page_id_(page_id),
+      frame_(std::move(frame)),
+      replacer_(std::move(replacer)),
+      bpm_latch_(std::move(bpm_latch)),
+      read_lock_(frame_->rwlatch_) {
   bpm_latch_->lock();
   frame_->pin_count_.fetch_add(1);
   replacer_->SetEvictable(frame_->frame_id_, false);
@@ -84,8 +86,8 @@ ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept {
  * @param that The other page guard.
  * @return ReadPageGuard& The newly valid `ReadPageGuard`.
  */
-auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & { 
-  if(&that == this){
+auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & {
+  if (&that == this) {
     return *this;
   }
   this->Drop();
@@ -97,9 +99,9 @@ auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & 
   read_lock_ = std::move(that.read_lock_);
   is_copy_ = false;
   that.is_copy_ = true;
-  //cout<<page_id_<<" "<<this->is_copy_<<' '<<that.is_copy_<<endl;
+  // cout<<page_id_<<" "<<this->is_copy_<<' '<<that.is_copy_<<endl;
   is_drop_ = that.is_drop_;
-  return *this; 
+  return *this;
 }
 
 /**
@@ -138,15 +140,13 @@ auto ReadPageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void ReadPageGuard::Drop() {
-
-  if(!is_copy_ && !is_drop_){
+  if (!is_copy_ && !is_drop_) {
     is_drop_ = true;
-    if(frame_->pin_count_.fetch_sub(1) == 1){
+    if (frame_->pin_count_.fetch_sub(1) == 1) {
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
     read_lock_.unlock();
   }
-
 }
 
 /** @brief The destructor for `ReadPageGuard`. This destructor simply calls `Drop()`. */
@@ -170,14 +170,17 @@ ReadPageGuard::~ReadPageGuard() { Drop(); }
  */
 WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> frame,
                                std::shared_ptr<LRUKReplacer> replacer, std::shared_ptr<std::mutex> bpm_latch)
-    : page_id_(page_id), frame_(std::move(frame)), replacer_(std::move(replacer)),
-     bpm_latch_(std::move(bpm_latch)), write_lock_(frame_->rwlatch_)
-                                        //获得写锁
+    : page_id_(page_id),
+      frame_(std::move(frame)),
+      replacer_(std::move(replacer)),
+      bpm_latch_(std::move(bpm_latch)),
+      write_lock_(frame_->rwlatch_)
+//获得写锁
 {
   bpm_latch_->lock();
   frame_->pin_count_.fetch_add(1);
   replacer_->SetEvictable(frame_->frame_id_, false);
-  bpm_latch_->unlock();  
+  bpm_latch_->unlock();
   frame_->is_dirty_ = true;
   is_valid_ = true;
 }
@@ -225,8 +228,8 @@ WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {
  * @param that The other page guard.
  * @return WritePageGuard& The newly valid `WritePageGuard`.
  */
-auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & { 
-  if(&that == this){
+auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & {
+  if (&that == this) {
     return *this;
   }
   this->Drop();
@@ -238,9 +241,9 @@ auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard
   write_lock_ = std::move(that.write_lock_);
   is_copy_ = false;
   that.is_copy_ = true;
-  //cout<<page_id_<<" "<<this->is_copy_<<' '<<that.is_copy_<<endl;
+  // cout<<page_id_<<" "<<this->is_copy_<<' '<<that.is_copy_<<endl;
   is_drop_ = that.is_drop_;
-  return *this; 
+  return *this;
 }
 
 /**
@@ -286,12 +289,12 @@ auto WritePageGuard::IsDirty() const -> bool {
  *
  * TODO(P1): Add implementation.
  */
-void WritePageGuard::Drop() { 
-  //cout<<"xigou"<<page_id_<<" "<<this->is_copy_<<endl;
-  //cout<<is_copy_<<' '<<is_drop_<<endl;
-  if(!is_copy_ && !is_drop_){
+void WritePageGuard::Drop() {
+  // cout<<"xigou"<<page_id_<<" "<<this->is_copy_<<endl;
+  // cout<<is_copy_<<' '<<is_drop_<<endl;
+  if (!is_copy_ && !is_drop_) {
     is_drop_ = true;
-    if(frame_->pin_count_.fetch_sub(1) == 1){
+    if (frame_->pin_count_.fetch_sub(1) == 1) {
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
     write_lock_.unlock();
