@@ -20,6 +20,8 @@
 #include "common/config.h"
 #include "storage/page/page_guard.h"
 
+using std::cout, std::endl;
+
 namespace bustub {
 
 /**
@@ -203,6 +205,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
       //使用lruk驱逐帧
       auto evict_frame = replacer_->Evict();
       if(!evict_frame.has_value()){
+        bpm_latch_->unlock();
         return std::nullopt;
       }
       frame_id = evict_frame.value();
@@ -216,6 +219,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
         disk_scheduler_->Schedule(DiskRequest(
           {true, frame_header->data_.data(), frame_header->page_id_,std::move(promise)}));
         if(!future.get()){
+          bpm_latch_->unlock();
           return std::nullopt;
         }
       }
@@ -235,6 +239,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
       false, frame_header->data_.data(), page_id, std::move(promise)
     }));
     if(!future.get()){
+      bpm_latch_->unlock();
       return std::nullopt;
     }
     

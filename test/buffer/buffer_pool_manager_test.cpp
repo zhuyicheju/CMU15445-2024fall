@@ -17,7 +17,7 @@
 #include "buffer/buffer_pool_manager.h"
 #include "gtest/gtest.h"
 #include "storage/page/page_guard.h"
-
+using std::cout, std::endl;
 namespace bustub {
 
 static std::filesystem::path db_fname("test.bustub");
@@ -74,7 +74,6 @@ TEST(BufferPoolManagerTest, PagePinEasyTest) {
     ASSERT_TRUE(page0_write_opt.has_value());
     WritePageGuard page0_write = std::move(page0_write_opt.value());
     strcpy(page0_write.GetDataMut(), "page0");  // NOLINT
-
     pageid1 = bpm->NewPage();
     auto page1_write_opt = bpm->CheckedWritePage(pageid1);
     ASSERT_TRUE(page1_write_opt.has_value());
@@ -83,14 +82,14 @@ TEST(BufferPoolManagerTest, PagePinEasyTest) {
 
     ASSERT_EQ(1, bpm->GetPinCount(pageid0));
     ASSERT_EQ(1, bpm->GetPinCount(pageid1));
-  std::cout<<111<<std::endl;
 
     page_id_t temp_page_id1 = bpm->NewPage();
     auto temp_page1_opt = bpm->CheckedReadPage(temp_page_id1);
     ASSERT_FALSE(temp_page1_opt.has_value());
-
+    
     page_id_t temp_page_id2 = bpm->NewPage();
     auto temp_page2_opt = bpm->CheckedWritePage(temp_page_id2);
+
     ASSERT_FALSE(temp_page2_opt.has_value());
 
     ASSERT_EQ(1, bpm->GetPinCount(pageid0));
