@@ -428,6 +428,7 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
  * TODO(P1): Add implementation
  */
 void BufferPoolManager::FlushAllPages() {
+  std::lock_guard<std::mutex> lock(*bpm_latch_);
   for (const auto &frame_header : frames_) {
     if (frame_header->is_dirty_) {
       auto promise = disk_scheduler_->CreatePromise();

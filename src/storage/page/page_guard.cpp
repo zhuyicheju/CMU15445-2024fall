@@ -36,10 +36,7 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
       replacer_(std::move(replacer)),
       bpm_latch_(std::move(bpm_latch)),
       read_lock_(frame_->rwlatch_) {
-  bpm_latch_->lock();
   frame_->pin_count_.fetch_add(1);
-  replacer_->SetEvictable(frame_->frame_id_, false);
-  bpm_latch_->unlock();
   is_valid_ = true;
 }
 
@@ -142,8 +139,8 @@ auto ReadPageGuard::IsDirty() const -> bool {
 void ReadPageGuard::Drop() {
   if (!is_copy_ && !is_drop_ && is_valid_) {
     is_drop_ = true;
+    std::lock_guard<std::mutex> lock(*bpm_latch_);
     if (frame_->pin_count_.fetch_sub(1) == 1) {
-      std::lock_guard<std::mutex> lock(*bpm_latch_);
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
     read_lock_.unlock();
@@ -178,11 +175,7 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
       write_lock_(frame_->rwlatch_)
 //获得写锁
 {
-  bpm_latch_->lock();
   frame_->pin_count_.fetch_add(1);
-  replacer_->SetEvictable(frame_->frame_id_, false);
-  bpm_latch_->unlock();
-  frame_->is_dirty_ = true;
   is_valid_ = true;
 }
 
@@ -268,6 +261,7 @@ auto WritePageGuard::GetData() const -> const char * {
  */
 auto WritePageGuard::GetDataMut() -> char * {
   BUSTUB_ENSURE(is_valid_, "tried to use an invalid write guard");
+  frame_->is_dirty_ = true;
   return frame_->GetDataMut();
 }
 
@@ -295,8 +289,8 @@ void WritePageGuard::Drop() {
   // cout<<is_copy_<<' '<<is_drop_<<endl;
   if (!is_copy_ && !is_drop_ && is_valid_) {
     is_drop_ = true;
+    std::lock_guard<std::mutex> lock(*bpm_latch_);
     if (frame_->pin_count_.fetch_sub(1) == 1) {
-      std::lock_guard<std::mutex> lock(*bpm_latch_);
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
     write_lock_.unlock();

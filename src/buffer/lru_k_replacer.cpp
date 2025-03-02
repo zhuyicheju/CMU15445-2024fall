@@ -48,6 +48,7 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
  * @return true if a frame is evicted successfully, false if no frames can be evicted.
  */
 auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
+  std::lock_guard<std::mutex> lock(latch_);
   std::optional<frame_id_t> frame = std::nullopt;
   size_t k_timestrap = 0xffffffffff3f3f3f;
   size_t lru_timestrap = 0xffffffffff3f3f3f;
@@ -93,6 +94,7 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
  */
 void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType access_type) {
   BUSTUB_ASSERT(static_cast<size_t>(frame_id) <= replacer_size_, "frame id is invalid");
+  std::lock_guard<std::mutex> lock(latch_);
 
   auto iter = node_store_.find(frame_id);
   auto now = std::chrono::system_clock::now();
@@ -137,6 +139,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
  */
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   BUSTUB_ASSERT(static_cast<size_t>(frame_id) <= replacer_size_, "frame id is invalid");
+  std::lock_guard<std::mutex> lock(latch_);
   auto iter = node_store_.find(frame_id);
   if (iter == node_store_.end()) {
     return;
@@ -172,6 +175,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
  */
 void LRUKReplacer::Remove(frame_id_t frame_id) {
   BUSTUB_ASSERT(static_cast<size_t>(frame_id) <= replacer_size_, "frame id is invalid");
+  std::lock_guard<std::mutex> lock(latch_);
   auto iter = node_store_.find(frame_id);
   if (iter == node_store_.end()) {
     return;
