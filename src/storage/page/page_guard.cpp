@@ -140,10 +140,10 @@ auto ReadPageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void ReadPageGuard::Drop() {
-  if (!is_copy_ && !is_drop_) {
+  if (!is_copy_ && !is_drop_ && is_valid_) {
     is_drop_ = true;
-    std::lock_guard<std::mutex> lock(*bpm_latch_);
     if (frame_->pin_count_.fetch_sub(1) == 1) {
+      std::lock_guard<std::mutex> lock(*bpm_latch_);
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
     read_lock_.unlock();
@@ -293,10 +293,10 @@ auto WritePageGuard::IsDirty() const -> bool {
 void WritePageGuard::Drop() {
   // cout<<"xigou"<<page_id_<<" "<<this->is_copy_<<endl;
   // cout<<is_copy_<<' '<<is_drop_<<endl;
-  if (!is_copy_ && !is_drop_) {
+  if (!is_copy_ && !is_drop_ && is_valid_) {
     is_drop_ = true;
-    std::lock_guard<std::mutex> lock(*bpm_latch_);
     if (frame_->pin_count_.fetch_sub(1) == 1) {
+      std::lock_guard<std::mutex> lock(*bpm_latch_);
       replacer_->SetEvictable(frame_->frame_id_, true);
     }
     write_lock_.unlock();
