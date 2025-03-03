@@ -35,9 +35,8 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
       frame_(std::move(frame)),
       replacer_(std::move(replacer)),
       bpm_latch_(std::move(bpm_latch)),
-      read_lock_(frame_->rwlatch_) {
-  is_valid_ = true;
-}
+      is_valid_(true),
+      read_lock_(frame_->rwlatch_) {}
 
 /**
  * @brief The move constructor for `ReadPageGuard`.
@@ -171,11 +170,9 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
       frame_(std::move(frame)),
       replacer_(std::move(replacer)),
       bpm_latch_(std::move(bpm_latch)),
-      write_lock_(frame_->rwlatch_)
+      is_valid_(true),
+      write_lock_(frame_->rwlatch_) {}
 //获得写锁
-{
-  is_valid_ = true;
-}
 
 /**
  * @brief The move constructor for `WritePageGuard`.

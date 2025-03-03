@@ -183,6 +183,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
     free_frames_.push_back(frame_id);
   }
   return true;
+  //这个页在删除后is dirty并未置零
   // deallocate the fragmant of the disk;
 }
 
@@ -233,6 +234,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
     if (!future.get()) {
       return std::nullopt;
     }
+    frame_header->is_dirty_ = false;
 
     //对数据更新
     page_table_[page_id] = frame_id;
