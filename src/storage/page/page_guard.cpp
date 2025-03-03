@@ -36,7 +36,6 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
       replacer_(std::move(replacer)),
       bpm_latch_(std::move(bpm_latch)),
       read_lock_(frame_->rwlatch_) {
-  frame_->pin_count_.fetch_add(1);
   is_valid_ = true;
 }
 
@@ -175,7 +174,6 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
       write_lock_(frame_->rwlatch_)
 //获得写锁
 {
-  frame_->pin_count_.fetch_add(1);
   is_valid_ = true;
 }
 
@@ -285,8 +283,6 @@ auto WritePageGuard::IsDirty() const -> bool {
  * TODO(P1): Add implementation.
  */
 void WritePageGuard::Drop() {
-  // cout<<"xigou"<<page_id_<<" "<<this->is_copy_<<endl;
-  // cout<<is_copy_<<' '<<is_drop_<<endl;
   if (!is_copy_ && !is_drop_ && is_valid_) {
     is_drop_ = true;
     std::lock_guard<std::mutex> lock(*bpm_latch_);

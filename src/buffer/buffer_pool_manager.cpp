@@ -192,7 +192,6 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
   auto iter = page_table_.find(page_id);
   auto frame_id = 0;
   std::shared_ptr<FrameHeader> frame_header = nullptr;
-
   //如果缓冲区无请求页
   if (iter == page_table_.end()) {
     auto free_frame_iter = free_frames_.begin();
@@ -206,7 +205,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
       frame_id = evict_frame.value();
       frame_header = frames_[frame_id];
 
-      //将当前帧写入磁盘
+      //将驱逐帧写入磁盘
       if (frame_header->is_dirty_) {
         auto promise = disk_scheduler_->CreatePromise();
         auto future = promise.get_future();
@@ -218,6 +217,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
         frame_header->is_dirty_ = false;
       }
       page_table_.erase(frame_header->page_id_);
+      // replacer_->Remove(frame_id);
       //删除驱逐的数据
 
     } else {
@@ -245,6 +245,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
 
   replacer_->RecordAccess(frame_id, access_type);
   replacer_->SetEvictable(frame_header->frame_id_, false);
+  frame_header->pin_count_.fetch_add(1);
   return frame_header;
 }
 
@@ -412,7 +413,6 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
     }
     frame_header->is_dirty_ = false;
   }
-  // replacer_->Remove(frame_id);
 
   return true;
 }
