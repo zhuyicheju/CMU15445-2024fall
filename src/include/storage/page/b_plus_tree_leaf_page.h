@@ -87,7 +87,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
     return kstr;
   }
 
- private:
+// private:
   page_id_t next_page_id_;
   // Array members for page data.
   KeyType key_array_[LEAF_PAGE_SLOT_CNT];

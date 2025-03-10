@@ -11,7 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "storage/index/b_plus_tree.h"
+#include "common/config.h"
 #include "storage/index/b_plus_tree_debug.h"
+#include "storage/page/b_plus_tree_header_page.h"
+#include "storage/page/b_plus_tree_leaf_page.h"
+#include "storage/page/b_plus_tree_page.h"
+#include "storage/page/page_guard.h"
 
 namespace bustub {
 
@@ -34,7 +39,7 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, page_id_t header_page_id, BufferPool
  * @return Returns true if this B+ tree has no keys and values.
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return true; }
+auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return is_empty_; }
 
 /*****************************************************************************
  * SEARCH
@@ -72,10 +77,63 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool {
-  // Declaration of context instance.
-  Context ctx;
-  (void)ctx;
+  WritePageGuard header_guard = bpm_->WritePage(header_page_id_);
+  auto header_page = header_guard.AsMut<BPlusTreeHeaderPage>();
+  page_id_t root_page_id = INVALID_PAGE_ID;
+  if(header_page->root_page_id_ == INVALID_PAGE_ID){
+    page_id_t page = bpm_->NewPage();
+    header_page->root_page_id_ = page;
+    root_page_id = page;
+    header_guard.Drop();
+    WritePageGuard root_guard = bpm_->WritePage(page);
+    auto root_page = root_guard.AsMut<BPlusTreePage>();
+    root_page->SetPageType(IndexPageType::LEAF_PAGE);
+    root_page->SetMaxSize(leaf_max_size_);
+    root_page->SetSize(0);
+    //设置root_page基本类型
+  }else{
+    root_page_id = header_page->root_page_id_;
+    header_guard.Drop();
+  }
+
+  WritePageGuard root_guard = bpm_->WritePage(root_page_id);
+  auto root_page = root_guard.AsMut<BPlusTreePage>();
+  if(root_page->IsLeafPage()){
+    //root_guard.Drop();
+    auto leaf_page = root_guard.AsMut<LeafPage>();
+    int cur_size = leaf_page->GetSize();
+    if(cur_size == leaf_page->GetMaxSize()){
+      return false;
+    }
+    int i = 0;    
+    auto& key_array = leaf_page->key_array_;
+    auto& rid_array = leaf_page->rid_array_;
+    for(; i < cur_size && comparator_(key, key_array[i]); i ++) {;}
+    if(!comparator_(key_array[i], key)){
+      //二者等于
+      return false;
+    }
+
+    for(int j = cur_size; j > i; j--){
+      key_array[j] = key_array[j-1];
+      rid_array[j] = rid_array[j-1];
+    }
+
+    leaf_page->ChangeSizeBy(1);
+    key_array[i] = std::move(key);
+    rid_array[i] = std::move(value);
+
+    return true;
+  }else{
+
+  //内部节点向下遍历
+  }
+  //root_guard.Drop();
+
   return false;
+ 
+
+  //return false;
 }
 
 /*****************************************************************************
@@ -128,7 +186,11 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE(); 
  * @return Page id of the root of this tree
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { return 0; }
+auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { 
+  ReadPageGuard guard = bpm_->ReadPage(header_page_id_);
+  auto header_page = guard.As<BPlusTreeHeaderPage>();
+  return header_page->root_page_id_;
+}
 
 template class BPlusTree<GenericKey<4>, RID, GenericComparator<4>>;
 

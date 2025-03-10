@@ -13,6 +13,7 @@
 #include "buffer/buffer_pool_manager.h"
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -189,7 +190,7 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
 
 auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_type)
     -> std::optional<std::shared_ptr<FrameHeader>> {
-  std::lock_guard<std::mutex> lock(*bpm_latch_);
+  std::unique_lock<std::mutex> lock(*bpm_latch_);
   auto iter = page_table_.find(page_id);
   auto frame_id = 0;
   std::shared_ptr<FrameHeader> frame_header = nullptr;
@@ -208,6 +209,8 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
 
       //将驱逐帧写入磁盘
       if (frame_header->is_dirty_) {
+        //frame_header->pin_count_.fetch_add(1);
+        //lock.unlock();
         auto promise = disk_scheduler_->CreatePromise();
         auto future = promise.get_future();
         disk_scheduler_->Schedule(
@@ -215,7 +218,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
         if (!future.get()) {
           return std::nullopt;
         }
-        frame_header->is_dirty_ = false;
+        //lock.lock();
       }
       page_table_.erase(frame_header->page_id_);
       // replacer_->Remove(frame_id);
@@ -227,6 +230,7 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
       free_frames_.erase(free_frame_iter);
     }
 
+    //lock.unlock();
     //将请求帧写入缓冲区
     auto promise = disk_scheduler_->CreatePromise();
     auto future = promise.get_future();
@@ -234,6 +238,8 @@ auto BufferPoolManager::AcquireFrameHeader(page_id_t page_id, AccessType access_
     if (!future.get()) {
       return std::nullopt;
     }
+    //lock.lock();
+
     frame_header->is_dirty_ = false;
 
     //对数据更新
