@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "storage/index/b_plus_tree.h"
+#include <algorithm>
 #include "common/config.h"
 #include "storage/index/b_plus_tree_debug.h"
 #include "storage/page/b_plus_tree_header_page.h"
@@ -41,6 +42,48 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, page_id_t header_page_id, BufferPool
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return is_empty_; }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::vector<ValueType> *result) -> bool {
+  if(cur_page_id == INVALID_PAGE_ID){
+    return false;
+  }
+  ReadPageGuard cur_page_guard = bpm_->ReadPage(cur_page_id);
+  auto cur_page = cur_page_guard.As<BPlusTreePage>();
+  if(cur_page->IsLeafPage()){
+    auto leaf_page = cur_page_guard.As
+                      <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
+    
+    int size = leaf_page->GetSize();
+    auto& key_array = leaf_page->key_array_;
+    auto& rid_array = leaf_page->rid_array_;
+    for(int i = 0; i < size; i ++) {
+      if(comparator_(key_array[i], key) == 0){
+        result->push_back(rid_array[i]);
+        return true;
+      }
+    }
+
+    return false;
+    
+  }
+
+  if(cur_page->IsInternalPage()){
+    auto internal_page = cur_page_guard.As
+                        <BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>>();
+    page_id_t next_page_id = INVALID_PAGE_ID;
+    auto& key_array = internal_page->key_array_;
+    int i = 1;
+    for(i < internal_page->GetSize() && comparator_(key, key_array[i]); i ++){;}
+    next_page_id = internal_page->page_id_array_[i-1];
+    ///
+    /// 是否要释放PAGEGUARD
+    ///
+    return PageSearch(next_page_id, key, result);
+  }
+
+}
+
+
 /*****************************************************************************
  * SEARCH
  *****************************************************************************/
@@ -55,11 +98,40 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return is_empty_; }
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result) -> bool {
-  // Declaration of context instance.
-  Context ctx;
-  (void)ctx;
-  return false;
+  ReadPageGuard header_page_guard = bpm_->ReadPage(header_page_id_);
+  auto header_page = header_page_guard.As<BPlusTreeHeaderPage>();
+  return PageSearch(header_page->root_page_id_, key, result);
 }
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const ValueType &value) -> bool {
+    int cur_size = leaf_page->GetSize();
+    if(cur_size == leaf_page->GetMaxSize()){
+      return false;
+    }
+    int i = 0;    
+    auto& key_array = leaf_page->key_array_;
+    auto& rid_array = leaf_page->rid_array_;
+    for(; i < cur_size && comparator_(key, key_array[i]) < 0; i ++) {;}
+    if(comparator_(key, key_array[i]) == 0){
+      //二者等于
+      return false;
+    }
+
+    //将i以后的键值对往后挪一格
+    for(int j = cur_size; j > i; j--){
+      key_array[j] = key_array[j-1];
+      rid_array[j] = rid_array[j-1];
+    }
+
+    leaf_page->ChangeSizeBy(1);
+    key_array[i] = std::move(key);
+    rid_array[i] = std::move(value);
+
+    return true;
+}
+
+
 
 /*****************************************************************************
  * INSERTION
@@ -80,16 +152,16 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
   WritePageGuard header_guard = bpm_->WritePage(header_page_id_);
   auto header_page = header_guard.AsMut<BPlusTreeHeaderPage>();
   page_id_t root_page_id = INVALID_PAGE_ID;
+
   if(header_page->root_page_id_ == INVALID_PAGE_ID){
+    //当前树无根节点
     page_id_t page = bpm_->NewPage();
     header_page->root_page_id_ = page;
     root_page_id = page;
     header_guard.Drop();
     WritePageGuard root_guard = bpm_->WritePage(page);
-    auto root_page = root_guard.AsMut<BPlusTreePage>();
-    root_page->SetPageType(IndexPageType::LEAF_PAGE);
-    root_page->SetMaxSize(leaf_max_size_);
-    root_page->SetSize(0);
+    auto root_page = root_guard.AsMut<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
+    root_page->Init(leaf_max_size_);
     //设置root_page基本类型
   }else{
     root_page_id = header_page->root_page_id_;
@@ -98,42 +170,15 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
 
   WritePageGuard root_guard = bpm_->WritePage(root_page_id);
   auto root_page = root_guard.AsMut<BPlusTreePage>();
+
   if(root_page->IsLeafPage()){
-    //root_guard.Drop();
     auto leaf_page = root_guard.AsMut<LeafPage>();
-    int cur_size = leaf_page->GetSize();
-    if(cur_size == leaf_page->GetMaxSize()){
-      return false;
-    }
-    int i = 0;    
-    auto& key_array = leaf_page->key_array_;
-    auto& rid_array = leaf_page->rid_array_;
-    for(; i < cur_size && comparator_(key, key_array[i]); i ++) {;}
-    if(!comparator_(key_array[i], key)){
-      //二者等于
-      return false;
-    }
-
-    for(int j = cur_size; j > i; j--){
-      key_array[j] = key_array[j-1];
-      rid_array[j] = rid_array[j-1];
-    }
-
-    leaf_page->ChangeSizeBy(1);
-    key_array[i] = std::move(key);
-    rid_array[i] = std::move(value);
-
-    return true;
-  }else{
-
-  //内部节点向下遍历
+    return InsertLeaf(leaf_page, key, value);
   }
-  //root_guard.Drop();
-
+  if(root_page->IsInternalPage()){
+    //内部节点向下遍历
+  }
   return false;
- 
-
-  //return false;
 }
 
 /*****************************************************************************

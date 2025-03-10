@@ -15,6 +15,7 @@
 #include <queue>
 #include <string>
 
+#include "common/config.h"
 #include "storage/page/b_plus_tree_page.h"
 
 namespace bustub {
@@ -90,10 +91,11 @@ class BPlusTreeInternalPage : public BPlusTreePage {
     return kstr;
   }
 
- private:
+// private:
   // Array members for page data.
   KeyType key_array_[INTERNAL_PAGE_SLOT_CNT];
-  ValueType page_id_array_[INTERNAL_PAGE_SLOT_CNT];
+  //ValueType page_id_array_[INTERNAL_PAGE_SLOT_CNT];
+  page_id_t page_id_array_[INTERNAL_PAGE_SLOT_CNT];
   // (Fall 2024) Feel free to add more fields and helper functions below if needed
 };
 

@@ -32,7 +32,11 @@ namespace bustub {
  * @param max_size Max size of the leaf node
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(int max_size) {}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(int max_size) {
+    SetPageType(IndexPageType::LEAF_PAGE);
+    SetMaxSize(max_size);
+    SetSize(0);
+}
 
 /**
  * Helper methods to set/get next page id

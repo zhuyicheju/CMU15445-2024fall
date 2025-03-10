@@ -48,6 +48,7 @@ class BPlusTreePage {
   ~BPlusTreePage() = delete;
 
   auto IsLeafPage() const -> bool;
+  auto IsInternalPage() const -> bool;
   void SetPageType(IndexPageType page_type);
 
   auto GetSize() const -> int;

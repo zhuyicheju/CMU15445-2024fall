@@ -118,6 +118,10 @@ class BPlusTree {
   void BatchOpsFromFile(const std::filesystem::path &file_name);
 
  private:
+  auto PageSearch(page_id_t cur_page, const KeyType &key, std::vector<ValueType> *result) -> bool;
+  auto InsertLeaf(LeafPage* leafpage, const KeyType &key, const ValueType &value) -> bool;
+
+
   void ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out);
 
   void PrintTree(page_id_t page_id, const BPlusTreePage *page);
