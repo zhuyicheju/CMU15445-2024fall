@@ -113,7 +113,7 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
 
   if(cur_page->IsLeafPage()){
     auto leaf_page = cur_page_guard.AsMut<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
-    return InsertLeaf(leaf_page, key, value, context);
+    return InsertLeaf(leaf_page, key, value, context, cur_page_id);
   }
 
   if(cur_page->IsInternalPage()){
@@ -131,9 +131,42 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
   return false;
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t left_page, page_id_t right_page, KeyType right_key) -> bool {
+  if(context->write_set_.empty()){
+    //当前为根节点
+    page_id_t new_page_id = bpm_->NewPage();
+    WritePageGuard new_page_guard = bpm_->WritePage(new_page_id);
+    auto new_page = new_page_guard.AsMut
+                        <BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>>();
+    new_page->Init(internal_max_size_);
+    new_page->key_array_[1] = right_key;
+    new_page->page_id_array_[0] = left_page;
+    new_page->page_id_array_[1] = right_page;
+    return true;
+  }
+  
+  
+  
+  
+  // auto up_page_guard = std::move(context->write_set_.front());
+  // context->write_set_.pop_front();
+  // auto up_page = up_page_guard.AsMut
+  //                     <BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>>();
+
+  // int cur_size = up_page->GetSize();
+  // if(cur_size == up_page->GetMaxSize()){
+  //   return false;
+  // }
+
+
+
+  return false;
+}
+
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context) -> bool {
+auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context, page_id_t leaf_page_id) -> bool {
     int cur_size = leaf_page->GetSize();
     if(cur_size == leaf_page->GetMaxSize()){
       //特判节点相等情况
@@ -153,7 +186,7 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       new_leaf_page->Init(leaf_max_size_);
 
       int i = 0;
-      int ceil = (cur_size + 1) / 2;
+      int ceil = cur_size / 2;
       int left_or_right = 0;
       //决定新key插入在左边还是右边;
       
@@ -174,18 +207,24 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       }
       //将一半（向上取整）的节点复制到新节点中
       new_leaf_page->ChangeSizeBy(i + 1 - left_or_right);
-      leaf_page->ChangeSizeBy(-i + left_or_right); //插入的一个
 
+
+      //将后面的节点挪到前面
+      already_pushed = 0;//没有用
       for(int j = i; j < cur_size; j ++){
-        leaf_page->key_array_[j - i] = std::move(leaf_page->key_array_[j]);
-        leaf_page->rid_array_[j - i] = std::move(leaf_page->rid_array_[j]); 
+        if(left_or_right && comparator_(key, leaf_page->key_array_[j]) < 0){
+          leaf_page->key_array_[j - i] = std::move(key);
+          leaf_page->rid_array_[j - i] = std::move(value);
+
+          already_pushed = 1;
+        }
+        leaf_page->key_array_[j - i + already_pushed] = std::move(leaf_page->key_array_[j]);
+        leaf_page->rid_array_[j - i + already_pushed] = std::move(leaf_page->rid_array_[j]); 
       }
-        
-
-
-
-
-      return false;
+      leaf_page->ChangeSizeBy(-i + left_or_right);
+      
+      return UpInsert(context, new_leaf_page_id, leaf_page_id, leaf_page->key_array_[0]);
+      //如果context中无内容就代表是根节点要替换根节点
     }
 
     int i = 0;    

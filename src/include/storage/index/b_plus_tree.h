@@ -119,9 +119,12 @@ class BPlusTree {
 
  private:
   auto PageSearch(page_id_t cur_page, const KeyType &key, std::vector<ValueType> *result) const -> bool;
-  auto PageInsert(page_id_t cur_page, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context) -> bool;
-  auto InsertLeaf(LeafPage* leafpage, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context) -> bool;
 
+  auto PageInsert(page_id_t cur_page, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context) -> bool;
+
+  auto InsertLeaf(LeafPage* leafpage, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context, page_id_t leaf_page_id) -> bool;
+
+  auto UpInsert(const std::shared_ptr<Context>& context, page_id_t left_page, page_id_t right_page, KeyType right_key) -> bool;
 
   void ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out);
 
