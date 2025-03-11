@@ -136,6 +136,14 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context) -> bool {
     int cur_size = leaf_page->GetSize();
     if(cur_size == leaf_page->GetMaxSize()){
+      //特判节点相等情况
+      for(int i = 0; i < cur_size; i ++){
+        if(comparator_(key, leaf_page->key_array_[i]) == 0){
+          return false;
+        }
+      }
+
+
       //叶子节点溢出情况   
       page_id_t new_leaf_page_id = bpm_->NewPage();
       auto new_leaf_page_guard = bpm_->WritePage(new_leaf_page_id);
@@ -150,18 +158,23 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       //决定新key插入在左边还是右边;
       
       if(comparator_(key, leaf_page->key_array_[ceil-1]) > 0){
+        //比左边的最后一个元素大
         left_or_right = 1;
       }
 
-
-
+      int already_pushed = 0;
       for(; i < ceil; i ++ ){
-        new_leaf_page->key_array_[i] = std::move(leaf_page->key_array_[i]);
-        new_leaf_page->rid_array_[i] = std::move(leaf_page->rid_array_[i]);   
+        if(left_or_right==0 && comparator_(key, leaf_page->key_array_[i]) < 0){
+          new_leaf_page->key_array_[i] = std::move(key);
+          new_leaf_page->rid_array_[i] = std::move(value);  
+          already_pushed = 1;
+        }
+        new_leaf_page->key_array_[i + already_pushed] = std::move(leaf_page->key_array_[i]);
+        new_leaf_page->rid_array_[i + already_pushed] = std::move(leaf_page->rid_array_[i]);   
       }
       //将一半（向上取整）的节点复制到新节点中
-      new_leaf_page->ChangeSizeBy(i);
-      leaf_page->ChangeSizeBy(-i + 1); //插入的一个
+      new_leaf_page->ChangeSizeBy(i + 1 - left_or_right);
+      leaf_page->ChangeSizeBy(-i + left_or_right); //插入的一个
 
       for(int j = i; j < cur_size; j ++){
         leaf_page->key_array_[j - i] = std::move(leaf_page->key_array_[j]);
