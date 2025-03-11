@@ -75,7 +75,7 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
-    tree.Insert(index_key, rid);
+    EXPECT_EQ(true, tree.Insert(index_key, rid));
   }
 
   bool is_present;

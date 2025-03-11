@@ -41,7 +41,7 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, page_id_t header_page_id, BufferPool
  * @return Returns true if this B+ tree has no keys and values.
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return is_empty_; }
+auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return size_ == 0; }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::vector<ValueType> *result) const -> bool {
@@ -68,11 +68,12 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
 
   if(cur_page->IsInternalPage()){
     auto internal_page = cur_page_guard.As
-                        <BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>>();
+                        <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
     page_id_t next_page_id = INVALID_PAGE_ID;
     auto& key_array = internal_page->key_array_;
     int i = 1;
-    for(; i < internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
+    int cur_size = internal_page->GetSize();
+    for(; i <= cur_size && comparator_(key, key_array[i]) >= 0; i ++){;}
     next_page_id = internal_page->page_id_array_[i-1];
     ///
     /// 是否要释放PAGEGUARD
@@ -118,14 +119,14 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
 
   if(cur_page->IsInternalPage()){
     auto internal_page = cur_page_guard.As
-                        <BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>>();
+                        <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
     page_id_t next_page_id = INVALID_PAGE_ID;
     int i = 1;
     auto& key_array = internal_page->key_array_;
     for(; i < internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
     next_page_id = internal_page->page_id_array_[i-1];
 
-    context->write_set_.push_front(cur_page_guard);
+    context->write_set_.push_front(std::move(cur_page_guard));
     return PageInsert(next_page_id, key, value, context);
   }
   return false;
@@ -138,29 +139,21 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
     page_id_t new_page_id = bpm_->NewPage();
     WritePageGuard new_page_guard = bpm_->WritePage(new_page_id);
     auto new_page = new_page_guard.AsMut
-                        <BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>>();
+        <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
     new_page->Init(internal_max_size_);
     new_page->key_array_[1] = right_key;
     new_page->page_id_array_[0] = left_page;
     new_page->page_id_array_[1] = right_page;
+
+    new_page->ChangeSizeBy(1);
+
+    context->header_page_.value().
+        AsMut<BPlusTreeHeaderPage>()->root_page_id_ = new_page_id;
+
+    context->root_page_id_ = new_page_id;
+
     return true;
   }
-  
-  
-  
-  
-  // auto up_page_guard = std::move(context->write_set_.front());
-  // context->write_set_.pop_front();
-  // auto up_page = up_page_guard.AsMut
-  //                     <BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>>();
-
-  // int cur_size = up_page->GetSize();
-  // if(cur_size == up_page->GetMaxSize()){
-  //   return false;
-  // }
-
-
-
   return false;
 }
 
@@ -223,6 +216,8 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       }
       leaf_page->ChangeSizeBy(-i + left_or_right);
       
+      size_ ++;
+
       return UpInsert(context, new_leaf_page_id, leaf_page_id, leaf_page->key_array_[0]);
       //如果context中无内容就代表是根节点要替换根节点
     }
@@ -245,6 +240,8 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
     leaf_page->ChangeSizeBy(1);
     key_array[i] = std::move(key);
     rid_array[i] = std::move(value);
+
+    size_ ++;
 
     return true;
 }

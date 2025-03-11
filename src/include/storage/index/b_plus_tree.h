@@ -23,6 +23,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <deque>
 #include <filesystem>
 #include <iostream>
@@ -141,7 +142,7 @@ class BPlusTree {
   int internal_max_size_;
   page_id_t header_page_id_;
 
-  bool is_empty_{true};
+  size_t size_{0};
 };
 
 /**
