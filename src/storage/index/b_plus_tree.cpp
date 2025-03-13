@@ -242,7 +242,7 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
     int i = 0;    
     auto& key_array = leaf_page->key_array_;
     auto& rid_array = leaf_page->rid_array_;
-    for(; i < cur_size && comparator_(key, key_array[i]) < 0; i ++) {;}
+    for(; i < cur_size && comparator_(key, key_array[i]) > 0; i ++) {;}
     if(comparator_(key, key_array[i]) == 0){
       //二者等于
       return false;
@@ -259,7 +259,6 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
     rid_array[i] = std::move(value);
 
     size_ ++;
-
     return true;
 }
 
