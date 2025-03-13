@@ -59,7 +59,7 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
     int size = leaf_page->GetSize();
     auto& key_array = leaf_page->key_array_;
     auto& rid_array = leaf_page->rid_array_;
-    for(int i = 0; i < size && comparator_(key, key_array[i]) <= 0; i ++) {
+    for(int i = 0; i < size && comparator_(key, key_array[i]) >= 0; i ++) {
       if(comparator_(key_array[i], key) == 0){
         result->push_back(rid_array[i]);
         return true;
@@ -232,7 +232,6 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       }
 
       leaf_page->ChangeSizeBy(-i + left_or_right);
-      
       size_ ++;
 
       return UpInsert(context, new_leaf_page_id, leaf_page_id, leaf_page->key_array_[0]);
