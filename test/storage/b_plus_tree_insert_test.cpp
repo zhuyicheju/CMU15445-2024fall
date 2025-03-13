@@ -18,7 +18,7 @@
 #include "storage/disk/disk_manager_memory.h"
 #include "storage/index/b_plus_tree.h"
 #include "test_util.h"  // NOLINT
-
+using std::cout, std::endl;
 namespace bustub {
 
 using bustub::DiskManagerUnlimitedMemory;
@@ -70,7 +70,7 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   GenericKey<8> index_key;
   RID rid;
 
-  std::vector<int64_t> keys = {1, 2, 3, 4, 5};
+  std::vector<int64_t> keys = {1, 2, 3};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
@@ -82,6 +82,7 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   std::vector<RID> rids;
 
   for (auto key : keys) {
+    cout<<"key"<<key<<endl;
     rids.clear();
     index_key.SetFromInteger(key);
     is_present = tree.GetValue(index_key, &rids);

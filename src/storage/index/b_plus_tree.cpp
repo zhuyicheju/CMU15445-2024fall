@@ -19,7 +19,8 @@
 #include "storage/page/b_plus_tree_leaf_page.h"
 #include "storage/page/b_plus_tree_page.h"
 #include "storage/page/page_guard.h"
-
+using std::cout;
+using std::endl;
 namespace bustub {
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -45,6 +46,7 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return size_ == 0; }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::vector<ValueType> *result) const -> bool {
+  std::cout<<"search"<<cur_page_id<<std::endl;
   if(cur_page_id == INVALID_PAGE_ID){
     return false;
   }
@@ -134,6 +136,7 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t left_page, page_id_t right_page, KeyType right_key) -> bool {
+  cout<<left_page<<" upinsert "<<right_page<<' '<<right_key<<endl;
   if(context->write_set_.empty()){
     //当前为根节点
     page_id_t new_page_id = bpm_->NewPage();
@@ -169,7 +172,6 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
         }
       }
 
-
       //叶子节点溢出情况   
       page_id_t new_leaf_page_id = bpm_->NewPage();
       auto new_leaf_page_guard = bpm_->WritePage(new_leaf_page_id);
@@ -180,13 +182,9 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
 
       int i = 0;
       int ceil = cur_size / 2;
-      int left_or_right = 0;
+      int left_or_right = comparator_(key, leaf_page->key_array_[ceil-1]) > 0 ? 1 : 0;
       //决定新key插入在左边还是右边;
-      
-      if(comparator_(key, leaf_page->key_array_[ceil-1]) > 0){
-        //比左边的最后一个元素大
-        left_or_right = 1;
-      }
+      //左边0右边1
 
       int already_pushed = 0;
       for(; i < ceil; i ++ ){
@@ -198,12 +196,22 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
         new_leaf_page->key_array_[i + already_pushed] = std::move(leaf_page->key_array_[i]);
         new_leaf_page->rid_array_[i + already_pushed] = std::move(leaf_page->rid_array_[i]);   
       }
+      //特判插入值是左边最大值
+      if(left_or_right == 0 && already_pushed == 0){
+        new_leaf_page->key_array_[ceil] = std::move(key);
+        new_leaf_page->rid_array_[ceil] = std::move(value);
+        already_pushed = 1;
+      }
+
+
       //将一半（向上取整）的节点复制到新节点中
       new_leaf_page->ChangeSizeBy(i + 1 - left_or_right);
 
 
       //将后面的节点挪到前面
       already_pushed = 0;//没有用
+
+      //此情景下最大的那个值仍没被放入
       for(int j = i; j < cur_size; j ++){
         if(left_or_right && comparator_(key, leaf_page->key_array_[j]) < 0){
           leaf_page->key_array_[j - i] = std::move(key);
@@ -214,6 +222,15 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
         leaf_page->key_array_[j - i + already_pushed] = std::move(leaf_page->key_array_[j]);
         leaf_page->rid_array_[j - i + already_pushed] = std::move(leaf_page->rid_array_[j]); 
       }
+
+      //特判插入的值是最大值
+      if(left_or_right == 1 && already_pushed == 0){
+        leaf_page->key_array_[cur_size - i] = std::move(key);
+        leaf_page->rid_array_[cur_size - i] = std::move(value);
+
+        already_pushed = 1;
+      }
+
       leaf_page->ChangeSizeBy(-i + left_or_right);
       
       size_ ++;
