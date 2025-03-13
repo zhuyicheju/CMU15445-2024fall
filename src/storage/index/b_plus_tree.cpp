@@ -47,7 +47,6 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return size_ == 0; }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::vector<ValueType> *result) const -> bool {
-  std::cout<<"search"<<cur_page_id<<std::endl;
   if(cur_page_id == INVALID_PAGE_ID){
     return false;
   }
@@ -76,7 +75,6 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
     auto& key_array = internal_page->key_array_;
     int i = 1;
     int cur_size = internal_page->GetSize();
-    cout<<cur_size<<endl;
     for(; i <= cur_size && comparator_(key, key_array[i]) >= 0; i ++){;}
     next_page_id = internal_page->page_id_array_[i-1];
     ///
@@ -215,7 +213,8 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
       if(left_or_right == 1 && in_the_mid == 1){
         up_page->page_id_array_[0] = right_page;
       }
-      int start_point =  i + ((left_or_right==1&&in_the_mid==1)? 0 : 1);
+      
+      int start_point =  i;
       already_pushed = (left_or_right==1&&in_the_mid==1)? 1 : 0;
       int j = start_point;
       for(; j <= cur_size; j++){

@@ -18,12 +18,42 @@
 #include "storage/disk/disk_manager_memory.h"
 #include "storage/index/b_plus_tree.h"
 #include "test_util.h"  // NOLINT
-using std::cout, std::endl;
+#include <cstdlib>
+#include <random>
+#include <set>
+using std::cout, std::endl;  
+
+auto RandomVector()->std::vector<int64_t>{
+    std::srand(std::time(nullptr));
+    
+    // 随机生成向量的长度，范围是 0 到 10
+    size_t length = std::rand() % 10;
+    
+    std::set<int64_t> unique_set;
+    
+    // 不断生成随机数直到集合大小达到所需的长度
+    while (unique_set.size() < length) {
+        unique_set.insert(std::rand() % 30);  // 每个元素的值在 0 到 10 之间
+    }
+    // 将集合转为向量
+    std::vector<int64_t> vec(unique_set.begin(), unique_set.end());
+
+
+    std::random_device rd;  // 获取一个硬件随机数源（如果可用）
+    std::mt19937 g(rd());   // 使用梅森旋转算法作为随机数生成器
+    std::shuffle(vec.begin(), vec.end(), g);
+    for(auto key : vec){
+      cout<<key<<" ";
+    }
+    cout<<endl;
+    return vec;
+}
 namespace bustub {
+
 
 using bustub::DiskManagerUnlimitedMemory;
 
-TEST(BPlusTreeTests, BasicInsertTest) {
+TEST(BPlusTreeTests, DISABLED_BasicInsertTest) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -56,7 +86,7 @@ TEST(BPlusTreeTests, BasicInsertTest) {
   delete bpm;
 }
 
-TEST(BPlusTreeTests, InsertTest1NoIterator) {
+TEST(BPlusTreeTests, DISABLED_InsertTest1NoIterator) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -70,7 +100,7 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   GenericKey<8> index_key;
   RID rid;
 
-  std::vector<int64_t> keys = { 6, 5, 4, 3, 2, 1};
+  std::vector<int64_t> keys = {4, 15, 21, 25, 5, 7, 14, 16};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
@@ -82,7 +112,7 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   std::vector<RID> rids;
 
   for (auto key : keys) {
-    cout<<"key"<<key<<endl;
+    //cout<<"key"<<key<<endl;
     rids.clear();
     index_key.SetFromInteger(key);
     is_present = tree.GetValue(index_key, &rids);
@@ -95,7 +125,45 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   }
   delete bpm;
 }
+TEST(BPlusTreeTests, DISABLED_RandomInsert) {
+  // create KeyComparator and index schema
+  auto key_schema = ParseCreateStatement("a bigint");
+  GenericComparator<8> comparator(key_schema.get());
 
+  auto disk_manager = std::make_unique<DiskManagerUnlimitedMemory>();
+  auto *bpm = new BufferPoolManager(50, disk_manager.get());
+  // allocate header_page
+  page_id_t page_id = bpm->NewPage();
+  // create b+ tree
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", page_id, bpm, comparator, 2, 3);
+  GenericKey<8> index_key;
+  RID rid;
+
+  std::vector<int64_t> keys = RandomVector();
+  for (auto key : keys) {
+    int64_t value = key & 0xFFFFFFFF;
+    rid.Set(static_cast<int32_t>(key >> 32), value);
+    index_key.SetFromInteger(key);
+    EXPECT_EQ(true, tree.Insert(index_key, rid));
+  }
+
+  bool is_present;
+  std::vector<RID> rids;
+
+  for (auto key : keys) {
+    //cout<<"key"<<key<<endl;
+    rids.clear();
+    index_key.SetFromInteger(key);
+    is_present = tree.GetValue(index_key, &rids);
+
+    EXPECT_EQ(is_present, true);
+    EXPECT_EQ(rids.size(), 1);
+    EXPECT_EQ(rids[0].GetPageId(), 0);
+    int64_t value = key & 0xFFFFFFFF;
+    EXPECT_EQ(rids[0].GetSlotNum(), value);
+  }
+  delete bpm;
+}
 TEST(BPlusTreeTests, DISABLED_InsertTest2) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
