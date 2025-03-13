@@ -27,13 +27,13 @@ auto RandomVector()->std::vector<int64_t>{
     std::srand(std::time(nullptr));
     
     // 随机生成向量的长度，范围是 0 到 10
-    size_t length = std::rand() % 10;
+    size_t length = std::rand() % 1000000;
     
     std::set<int64_t> unique_set;
     
     // 不断生成随机数直到集合大小达到所需的长度
     while (unique_set.size() < length) {
-        unique_set.insert(std::rand() % 30);  // 每个元素的值在 0 到 10 之间
+        unique_set.insert(std::rand());  // 每个元素的值在 0 到 10 之间
     }
     // 将集合转为向量
     std::vector<int64_t> vec(unique_set.begin(), unique_set.end());
@@ -42,9 +42,9 @@ auto RandomVector()->std::vector<int64_t>{
     std::random_device rd;  // 获取一个硬件随机数源（如果可用）
     std::mt19937 g(rd());   // 使用梅森旋转算法作为随机数生成器
     std::shuffle(vec.begin(), vec.end(), g);
-    for(auto key : vec){
-      cout<<key<<" ";
-    }
+    // for(auto key : vec){
+    //   cout<<key<<" ";
+    // }
     cout<<endl;
     return vec;
 }
@@ -100,7 +100,7 @@ TEST(BPlusTreeTests, DISABLED_InsertTest1NoIterator) {
   GenericKey<8> index_key;
   RID rid;
 
-  std::vector<int64_t> keys = {4, 15, 21, 25, 5, 7, 14, 16};
+  std::vector<int64_t> keys = {26, 15, 4, 11, 18, 23};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
@@ -112,7 +112,7 @@ TEST(BPlusTreeTests, DISABLED_InsertTest1NoIterator) {
   std::vector<RID> rids;
 
   for (auto key : keys) {
-    //cout<<"key"<<key<<endl;
+    cout<<"key"<<key<<endl;
     rids.clear();
     index_key.SetFromInteger(key);
     is_present = tree.GetValue(index_key, &rids);
@@ -125,7 +125,7 @@ TEST(BPlusTreeTests, DISABLED_InsertTest1NoIterator) {
   }
   delete bpm;
 }
-TEST(BPlusTreeTests, DISABLED_RandomInsert) {
+TEST(BPlusTreeTests, RandomInsert) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());

@@ -47,6 +47,7 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return size_ == 0; }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::vector<ValueType> *result) const -> bool {
+  //cout<<"search"<<cur_page_id<<endl;
   if(cur_page_id == INVALID_PAGE_ID){
     return false;
   }
@@ -213,15 +214,15 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
       if(left_or_right == 1 && in_the_mid == 1){
         up_page->page_id_array_[0] = right_page;
       }
-      
-      int start_point =  i;
+
+      int start_point =  i + ((left_or_right==1&&in_the_mid==1)? 0 : 1);
       already_pushed = (left_or_right==1&&in_the_mid==1)? 1 : 0;
       int j = start_point;
       for(; j <= cur_size; j++){
         if(left_or_right == 1 && already_pushed == 0 && comparator_(right_key, up_page->key_array_[j]) < 0){
-          up_page->key_array_[j - i + 1] = std::move(right_key);
-          up_page->page_id_array_[j - i] = left_page;
-          up_page->page_id_array_[j - i + 1] = right_page;
+          up_page->key_array_[j - start_point + 1] = std::move(right_key);
+          up_page->page_id_array_[j - start_point] = left_page;
+          up_page->page_id_array_[j - start_point + 1] = right_page;
           // new_internal_page->key_array_[i] = std::move(right_key);
           // new_internal_page->page_id_array_[i - 1] = left_page;
           // new_internal_page->page_id_array_[i] = right_page;
