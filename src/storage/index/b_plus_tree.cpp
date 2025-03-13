@@ -76,6 +76,7 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
     auto& key_array = internal_page->key_array_;
     int i = 1;
     int cur_size = internal_page->GetSize();
+    cout<<cur_size<<endl;
     for(; i <= cur_size && comparator_(key, key_array[i]) >= 0; i ++){;}
     next_page_id = internal_page->page_id_array_[i-1];
     ///
@@ -137,7 +138,7 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t left_page, page_id_t right_page, KeyType right_key) -> bool {
-  cout<<left_page<<" upinsert "<<right_page<<' '<<right_key<<" "<<" "<<left_page<<" "<<context->write_set_.empty()<<endl;
+  //cout<<left_page<<" upinsert "<<right_page<<' '<<right_key<<" "<<" "<<left_page<<" "<<context->write_set_.empty()<<endl;
   if(context->write_set_.empty()){
     //当前为根节点
     page_id_t new_page_id = bpm_->NewPage();
@@ -192,9 +193,10 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
         }
 
         new_internal_page->key_array_[i + already_pushed] = std::move(up_page->key_array_[i]);
-        new_internal_page->page_id_array_[i + 2 * already_pushed - 1] = std::move(up_page->page_id_array_[i - 1]);
+        new_internal_page->page_id_array_[i + 2 * already_pushed - 1] = std::move(up_page->page_id_array_[i + already_pushed - 1]);
                                           //乘2代表抵消-1, 也就是额外加入的两个指针
       }
+
 
       KeyType up_key;
       if(left_or_right == 1 && in_the_mid == 1){
@@ -208,7 +210,6 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
         up_key = std::move(up_page->key_array_[i]);
         //将此键向上传
       }
-
       new_internal_page->ChangeSizeBy(i - left_or_right);
 
       if(left_or_right == 1 && in_the_mid == 1){
@@ -230,7 +231,7 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
           already_pushed = 1;
         }
         up_page->key_array_[j - start_point + already_pushed + 1] = std::move(up_page->key_array_[j]);
-        up_page->page_id_array_[j - start_point + 2*already_pushed] = up_page->page_id_array_[j - 1];
+        up_page->page_id_array_[j - start_point + 2*already_pushed] = up_page->page_id_array_[j + already_pushed - 1];
       }
 
       if(left_or_right==1&&already_pushed==0){
@@ -238,8 +239,20 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
         up_page->page_id_array_[j-start_point] = left_page;
         up_page->page_id_array_[j-start_point+1] = right_page;
       }
+      if(left_or_right == 0 && already_pushed == 0){
+        //新插入节点不在右边
+        up_page->page_id_array_[j - start_point] = up_page->page_id_array_[j-1];
+      }
 
-      up_page->ChangeSizeBy(1 - i + left_or_right);
+      int sub = (left_or_right==1&&in_the_mid==1) ? 0 : 1;
+      up_page->ChangeSizeBy(-(i-1) + left_or_right - sub);
+
+      // for(int k = 1; k <= 2;k++){
+      //   cout<<"key"<<new_internal_page->key_array_[k]<<endl;
+        
+      //   cout<<"id"<<new_internal_page->page_id_array_[k-1]<<endl;
+      // }
+      //   cout<<"id"<<new_internal_page->page_id_array_[2]<<endl;
 
       return UpInsert(context, new_internal_page_id,up_page_guard.GetPageId(), up_key);
   }

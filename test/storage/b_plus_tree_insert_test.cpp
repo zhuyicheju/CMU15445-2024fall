@@ -70,7 +70,7 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   GenericKey<8> index_key;
   RID rid;
 
-  std::vector<int64_t> keys = {1, 2, 3, 4, 5, 6};
+  std::vector<int64_t> keys = { 6, 5, 4, 3, 2, 1};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
