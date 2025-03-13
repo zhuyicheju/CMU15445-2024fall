@@ -13,6 +13,7 @@
 #include "storage/index/b_plus_tree.h"
 #include <algorithm>
 #include <memory>
+#include <utility>
 #include "common/config.h"
 #include "storage/index/b_plus_tree_debug.h"
 #include "storage/page/b_plus_tree_header_page.h"
@@ -125,7 +126,7 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
     page_id_t next_page_id = INVALID_PAGE_ID;
     int i = 1;
     auto& key_array = internal_page->key_array_;
-    for(; i < internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
+    for(; i <= internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
     next_page_id = internal_page->page_id_array_[i-1];
 
     context->write_set_.push_front(std::move(cur_page_guard));
@@ -136,7 +137,7 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t left_page, page_id_t right_page, KeyType right_key) -> bool {
-  cout<<left_page<<" upinsert "<<right_page<<' '<<right_key<<endl;
+  cout<<left_page<<" upinsert "<<right_page<<' '<<right_key<<" "<<" "<<left_page<<" "<<context->write_set_.empty()<<endl;
   if(context->write_set_.empty()){
     //当前为根节点
     page_id_t new_page_id = bpm_->NewPage();
@@ -157,7 +158,37 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
 
     return true;
   }
-  return false;
+
+  WritePageGuard up_page_guard = std::move(context->write_set_.front());
+  context->write_set_.pop_front();
+  auto up_page = up_page_guard.AsMut
+        <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
+  int cur_size = up_page->GetSize();
+  if(cur_size == up_page->GetMaxSize()){
+    //内部节点也已经满
+    return false;
+  }
+
+
+  //当前节点未满
+  int i = 1;
+  auto& key_array = up_page->key_array_;
+  auto& page_id_array = up_page->page_id_array_;
+  for(;i <= cur_size && comparator_(right_key, key_array[i]) >= 0;i++) {;}
+  
+  //将内部节点往后挪
+  for(int j = cur_size + 1; j > i ;j --){
+    key_array[j] = std::move(key_array[j-1]);
+    page_id_array[j] = page_id_array[j-1];
+  }
+
+  key_array[i] = std::move(right_key);
+  page_id_array[i - 1] = left_page;
+  page_id_array[i] = right_page;
+
+  up_page->ChangeSizeBy(1);
+
+  return true;
 }
 
 
