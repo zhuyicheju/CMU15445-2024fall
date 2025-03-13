@@ -163,14 +163,94 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
   context->write_set_.pop_front();
   auto up_page = up_page_guard.AsMut
         <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
+  //获得context中的栈元素
+  
   int cur_size = up_page->GetSize();
   if(cur_size == up_page->GetMaxSize()){
     //内部节点也已经满
-    return false;
+      page_id_t new_internal_page_id = bpm_->NewPage();
+      auto new_internal_page_guard = bpm_->WritePage(new_internal_page_id);
+      auto new_internal_page = new_internal_page_guard.AsMut
+        <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
+      new_internal_page->Init(internal_max_size_);
+
+      int i = 1;
+      int ceil = cur_size / 2;
+      int left_or_right = comparator_(right_key, up_page->key_array_[ceil]) > 0 ? 1 : 0;
+      int in_the_mid = comparator_(right_key, up_page->key_array_[ceil+1]) < 0 ? 1 : 0;
+      //必须在leftorright==1下成立
+
+      int already_pushed = 0;
+      for(; i < ceil + 1; i ++){
+        if(left_or_right == 0 && already_pushed == 0 && comparator_(right_key, up_page->key_array_[i]) < 0){
+          new_internal_page->key_array_[i] = std::move(right_key);
+          new_internal_page->page_id_array_[i - 1] = left_page;
+          new_internal_page->page_id_array_[i] = right_page;
+          //同时挂上两个页，此时顺序改变
+
+          already_pushed = 1;
+        }
+
+        new_internal_page->key_array_[i + already_pushed] = std::move(up_page->key_array_[i]);
+        new_internal_page->page_id_array_[i + 2 * already_pushed - 1] = std::move(up_page->page_id_array_[i - 1]);
+                                          //乘2代表抵消-1, 也就是额外加入的两个指针
+      }
+
+      KeyType up_key;
+      if(left_or_right == 1 && in_the_mid == 1){
+        new_internal_page->page_id_array_[i - 1] = left_page;
+        up_key = right_key;
+      }else{
+        if(already_pushed == 0){
+          //新插入节点不在左边
+          new_internal_page->page_id_array_[i - 1] = up_page->page_id_array_[ i - 1 ];
+        }
+        up_key = std::move(up_page->key_array_[i]);
+        //将此键向上传
+      }
+
+      new_internal_page->ChangeSizeBy(i - left_or_right);
+
+      if(left_or_right == 1 && in_the_mid == 1){
+        up_page->page_id_array_[0] = right_page;
+      }
+      int start_point =  i + ((left_or_right==1&&in_the_mid==1)? 0 : 1);
+      already_pushed = (left_or_right==1&&in_the_mid==1)? 1 : 0;
+      int j = start_point;
+      for(; j <= cur_size; j++){
+        if(left_or_right == 1 && already_pushed == 0 && comparator_(right_key, up_page->key_array_[j]) < 0){
+          up_page->key_array_[j - i + 1] = std::move(right_key);
+          up_page->page_id_array_[j - i] = left_page;
+          up_page->page_id_array_[j - i + 1] = right_page;
+          // new_internal_page->key_array_[i] = std::move(right_key);
+          // new_internal_page->page_id_array_[i - 1] = left_page;
+          // new_internal_page->page_id_array_[i] = right_page;
+          //同时挂上两个页，此时顺序改变
+
+          already_pushed = 1;
+        }
+        up_page->key_array_[j - start_point + already_pushed + 1] = std::move(up_page->key_array_[j]);
+        up_page->page_id_array_[j - start_point + 2*already_pushed] = up_page->page_id_array_[j - 1];
+      }
+
+      if(left_or_right==1&&already_pushed==0){
+        up_page->key_array_[j - start_point + 1] = std::move(right_key);
+        up_page->page_id_array_[j-start_point] = left_page;
+        up_page->page_id_array_[j-start_point+1] = right_page;
+      }
+
+      up_page->ChangeSizeBy(1 - i + left_or_right);
+
+      return UpInsert(context, new_internal_page_id,up_page_guard.GetPageId(), up_key);
   }
 
 
+
+
+
+
   //当前节点未满
+
   int i = 1;
   auto& key_array = up_page->key_array_;
   auto& page_id_array = up_page->page_id_array_;
@@ -219,7 +299,7 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
 
       int already_pushed = 0;
       for(; i < ceil; i ++ ){
-        if(left_or_right==0 && comparator_(key, leaf_page->key_array_[i]) < 0){
+        if(left_or_right==0 && already_pushed == 0 && comparator_(key, leaf_page->key_array_[i]) < 0){
           new_leaf_page->key_array_[i] = std::move(key);
           new_leaf_page->rid_array_[i] = std::move(value);  
           already_pushed = 1;
@@ -244,7 +324,7 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
 
       //此情景下最大的那个值仍没被放入
       for(int j = i; j < cur_size; j ++){
-        if(left_or_right && comparator_(key, leaf_page->key_array_[j]) < 0){
+        if(left_or_right== 1 && already_pushed == 0 && comparator_(key, leaf_page->key_array_[j]) < 0){
           leaf_page->key_array_[j - i] = std::move(key);
           leaf_page->rid_array_[j - i] = std::move(value);
 
