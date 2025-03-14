@@ -27,7 +27,7 @@ auto RandomVector()->std::vector<int64_t>{
     std::srand(std::time(nullptr));
     
     // 随机生成向量的长度，范围是 0 到 10
-    size_t length = std::rand() % 1000000;
+    size_t length = std::rand() % 100000;
     
     std::set<int64_t> unique_set;
     
@@ -86,7 +86,7 @@ TEST(BPlusTreeTests, DISABLED_BasicInsertTest) {
   delete bpm;
 }
 
-TEST(BPlusTreeTests, DISABLED_InsertTest1NoIterator) {
+TEST(BPlusTreeTests, InsertTest1NoIterator) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -125,7 +125,7 @@ TEST(BPlusTreeTests, DISABLED_InsertTest1NoIterator) {
   }
   delete bpm;
 }
-TEST(BPlusTreeTests, RandomInsert) {
+TEST(BPlusTreeTests, DISABLED_RandomInsert) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());

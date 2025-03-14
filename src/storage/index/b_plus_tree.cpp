@@ -257,11 +257,6 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
       return UpInsert(context, new_internal_page_id,up_page_guard.GetPageId(), up_key);
   }
 
-
-
-
-
-
   //当前节点未满
 
   int i = 1;
@@ -439,6 +434,68 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
   // }
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::RemoveLeaf(LeafPage* leaf_page, const KeyType &key, const std::shared_ptr<Context>& context, page_id_t leaf_page_id)  {
+  int cur_size = leaf_page->GetSize();
+  // if(cur_size <= leaf_page->GetMaxSize() / 2){
+  //   //节点半满
+  // }
+
+  int i = 0;    
+  auto& key_array = leaf_page->key_array_;
+  auto& rid_array = leaf_page->rid_array_;
+  for(; i < cur_size && comparator_(key, key_array[i]) > 0; i ++) {;}
+  if(comparator_(key, key_array[i]) != 0){
+    //无要删除键
+    return;
+  }
+
+
+  //将i以后得键往前挪
+  for(int j = i; j < cur_size - 1; j++){
+    key_array[j] = key_array[j+1];
+    rid_array[j] = std::move(rid_array[j+1]);
+  }
+
+  leaf_page->ChangeSizeBy(-1);
+  size_--;
+
+  if(size_ == 0){
+    context->header_page_.value().AsMut<BPlusTreeHeaderPage>()->root_page_id_ = INVALID_PAGE_ID;
+  }
+}
+
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::PageRemove(page_id_t cur_page_id, const KeyType& key,const std::shared_ptr<Context>& context) {
+  if(cur_page_id == INVALID_PAGE_ID){
+    return;
+  }
+  WritePageGuard cur_page_guard = bpm_->WritePage(cur_page_id);
+  auto cur_page = cur_page_guard.As
+    <BPlusTreePage>();
+  
+  if(cur_page->IsLeafPage()){
+    auto leaf_page = cur_page_guard.AsMut<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
+    RemoveLeaf(leaf_page, key, context, cur_page_id);
+  }
+
+  if(cur_page->IsInternalPage()){
+    auto internal_page = cur_page_guard.As
+                        <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
+    page_id_t next_page_id = INVALID_PAGE_ID;
+    int i = 1;
+    auto& key_array = internal_page->key_array_;
+    for(; i <= internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
+    next_page_id = internal_page->page_id_array_[i-1];
+
+    context->write_set_.push_front(std::move(cur_page_guard));
+    PageRemove(next_page_id, key, context);
+  }
+
+}
+
+
 /*****************************************************************************
  * REMOVE
  *****************************************************************************/
@@ -453,9 +510,14 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Remove(const KeyType &key) {
-  // Declaration of context instance.
-  Context ctx;
-  (void)ctx;
+  WritePageGuard header_page_guard = bpm_->WritePage(header_page_id_);
+  auto header_page = header_page_guard.As<BPlusTreeHeaderPage>();
+  std::shared_ptr<Context> context = std::make_shared<Context>();
+  context->root_page_id_ = header_page->root_page_id_;
+  context->header_page_ = std::move(header_page_guard);//只能通过右值拷贝
+
+  
+  return PageRemove(header_page->root_page_id_, key, context);
 }
 
 /*****************************************************************************

@@ -127,6 +127,10 @@ class BPlusTree {
 
   auto UpInsert(const std::shared_ptr<Context>& context, page_id_t left_page, page_id_t right_page, KeyType right_key) -> bool;
 
+  void PageRemove(page_id_t cur_page_id, const KeyType& key, const std::shared_ptr<Context>& context);
+
+  void RemoveLeaf(LeafPage* leaf_page, const KeyType &key, const std::shared_ptr<Context>& context, page_id_t leaf_page_id);
+
   void ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out);
 
   void PrintTree(page_id_t page_id, const BPlusTreePage *page);
