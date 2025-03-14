@@ -147,6 +147,8 @@ class BPlusTree {
   page_id_t header_page_id_;
 
   size_t size_{0};
+
+  page_id_t first_leaf_page_id_;
 };
 
 /**

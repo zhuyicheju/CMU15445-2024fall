@@ -40,7 +40,7 @@ class IndexIterator {
   auto operator!=(const IndexIterator &itr) const -> bool { throw std::runtime_error("unimplemented"); }
 
  private:
-  // add your own private member variables here
+  
 };
 
 }  // namespace bustub

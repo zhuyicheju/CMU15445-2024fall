@@ -16,6 +16,7 @@
 #include <utility>
 #include "common/config.h"
 #include "storage/index/b_plus_tree_debug.h"
+#include "storage/index/index_iterator.h"
 #include "storage/page/b_plus_tree_header_page.h"
 #include "storage/page/b_plus_tree_leaf_page.h"
 #include "storage/page/b_plus_tree_page.h"
@@ -47,7 +48,7 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return size_ == 0; }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::vector<ValueType> *result) const -> bool {
-  //cout<<"search"<<cur_page_id<<endl;
+  cout<<"search"<<cur_page_id<<endl;
   if(cur_page_id == INVALID_PAGE_ID){
     return false;
   }
@@ -247,13 +248,6 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
       int sub = (left_or_right==1&&in_the_mid==1) ? 0 : 1;
       up_page->ChangeSizeBy(-(i-1) + left_or_right - sub);
 
-      // for(int k = 1; k <= 2;k++){
-      //   cout<<"key"<<new_internal_page->key_array_[k]<<endl;
-        
-      //   cout<<"id"<<new_internal_page->page_id_array_[k-1]<<endl;
-      // }
-      //   cout<<"id"<<new_internal_page->page_id_array_[2]<<endl;
-
       return UpInsert(context, new_internal_page_id,up_page_guard.GetPageId(), up_key);
   }
 
@@ -298,6 +292,11 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
         <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
 
       new_leaf_page->Init(leaf_max_size_);
+      // new_leaf_page->next_page_id_ = leaf_page_id;
+      // if(first_leaf_page_id_ == leaf_page_id){
+      //   first_leaf_page_id_ = new_leaf_page_id;
+      // }
+      //设置迭代器的下一页
 
       int i = 0;
       int ceil = cur_size / 2;
@@ -305,55 +304,52 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       //决定新key插入在左边还是右边;
       //左边0右边1
 
+      //新页存放大的key
       int already_pushed = 0;
-      for(; i < ceil; i ++ ){
-        if(left_or_right==0 && already_pushed == 0 && comparator_(key, leaf_page->key_array_[i]) < 0){
+      for(; i < cur_size-ceil; i ++ ){
+        if(left_or_right==1 && already_pushed == 0 && comparator_(key, leaf_page->key_array_[ceil + i]) < 0){
           new_leaf_page->key_array_[i] = std::move(key);
-          new_leaf_page->rid_array_[i] = std::move(value);  
+          new_leaf_page->rid_array_[i] = std::move(value);
           already_pushed = 1;
         }
-        new_leaf_page->key_array_[i + already_pushed] = std::move(leaf_page->key_array_[i]);
-        new_leaf_page->rid_array_[i + already_pushed] = std::move(leaf_page->rid_array_[i]);   
+        new_leaf_page->key_array_[i + already_pushed] = std::move(leaf_page->key_array_[ceil + i]);
+        new_leaf_page->rid_array_[i + already_pushed] = std::move(leaf_page->rid_array_[ceil + i]);   
       }
       //特判插入值是左边最大值
-      if(left_or_right == 0 && already_pushed == 0){
-        new_leaf_page->key_array_[ceil] = std::move(key);
-        new_leaf_page->rid_array_[ceil] = std::move(value);
+      if(left_or_right == 1 && already_pushed == 0){
+        new_leaf_page->key_array_[i] = std::move(key);
+        new_leaf_page->rid_array_[i] = std::move(value);
         already_pushed = 1;
       }
 
-
       //将一半（向上取整）的节点复制到新节点中
-      new_leaf_page->ChangeSizeBy(i + 1 - left_or_right);
-
+      new_leaf_page->ChangeSizeBy(i + left_or_right);
 
       //将后面的节点挪到前面
       already_pushed = 0;//没有用
 
-      //此情景下最大的那个值仍没被放入
-      for(int j = i; j < cur_size; j ++){
-        if(left_or_right== 1 && already_pushed == 0 && comparator_(key, leaf_page->key_array_[j]) < 0){
-          leaf_page->key_array_[j - i] = std::move(key);
-          leaf_page->rid_array_[j - i] = std::move(value);
+      if(left_or_right == 0){
+        int j = 0;
+        auto& key_array = leaf_page->key_array_;
+        auto& rid_array = leaf_page->rid_array_;
+        for(; j < ceil && comparator_(key, key_array[j]) > 0; j ++) {;}
 
-          already_pushed = 1;
+        //将i以后的键值对往后挪一格
+        for(int k = ceil; k > j; k--){
+          key_array[k] = std::move(key_array[k-1]);
+          rid_array[k] = std::move(rid_array[k-1]);
         }
-        leaf_page->key_array_[j - i + already_pushed] = std::move(leaf_page->key_array_[j]);
-        leaf_page->rid_array_[j - i + already_pushed] = std::move(leaf_page->rid_array_[j]); 
+
+        key_array[j] = std::move(key);
+        rid_array[j] = std::move(value);
+
       }
 
-      //特判插入的值是最大值
-      if(left_or_right == 1 && already_pushed == 0){
-        leaf_page->key_array_[cur_size - i] = std::move(key);
-        leaf_page->rid_array_[cur_size - i] = std::move(value);
+      leaf_page->ChangeSizeBy(-cur_size+ceil + 1-left_or_right);
 
-        already_pushed = 1;
-      }
-
-      leaf_page->ChangeSizeBy(-i + left_or_right);
       size_ ++;
 
-      return UpInsert(context, new_leaf_page_id, leaf_page_id, leaf_page->key_array_[0]);
+      return UpInsert(context, leaf_page_id, new_leaf_page_id, new_leaf_page->key_array_[0]);
       //如果context中无内容就代表是根节点要替换根节点
     }
 
@@ -405,13 +401,14 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
   //获得root_page_id
   if(header_page->root_page_id_ == INVALID_PAGE_ID){
     //当前树无根节点
-    page_id_t page = bpm_->NewPage();
-    header_page->root_page_id_ = page;
-    root_page_id = page;
+    root_page_id = bpm_->NewPage();
+    header_page->root_page_id_ = root_page_id;
+    first_leaf_page_id_ = root_page_id;
     //header_guard.Drop();
-    WritePageGuard root_guard = bpm_->WritePage(page);
-    auto root_page = root_guard.AsMut<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
+    WritePageGuard root_page_guard = bpm_->WritePage(root_page_id);
+    auto root_page = root_page_guard.AsMut<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
     root_page->Init(leaf_max_size_);
+    root_page->next_page_id_ = INVALID_PAGE_ID;
     //设置root_page基本类型
   }else{
     root_page_id = header_page->root_page_id_;
@@ -529,7 +526,9 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key) {
  * @return : index iterator
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE(); }
+auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE { 
+  return INDEXITERATOR_TYPE();
+}
 
 /**
  * @brief Input parameter is low key, find the leaf page that contains the input key
