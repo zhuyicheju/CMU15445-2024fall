@@ -348,7 +348,9 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       leaf_page->ChangeSizeBy(-cur_size+ceil + 1-left_or_right);
 
       size_ ++;
-
+      cout<<"upinsert"<<leaf_page_id<<" "<<new_leaf_page_id<<" "<<new_leaf_page->key_array_[0]<<endl;
+      cout<<new_leaf_page->key_array_[0]<<" "<<new_leaf_page->key_array_[1]<<new_leaf_page->GetSize()<<endl;
+      cout<<leaf_page->key_array_[0]<<" "<<leaf_page->GetSize()<<endl;
       return UpInsert(context, leaf_page_id, new_leaf_page_id, new_leaf_page->key_array_[0]);
       //如果context中无内容就代表是根节点要替换根节点
     }
