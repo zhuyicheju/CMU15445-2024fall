@@ -77,6 +77,10 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
     auto& key_array = internal_page->key_array_;
     int i = 1;
     int cur_size = internal_page->GetSize();
+    // for(int j = 1;j <= cur_size;j++){
+    //   cout<<internal_page->key_array_[i]<<",";
+    // }
+    // cout<<endl;
     for(; i <= cur_size && comparator_(key, key_array[i]) >= 0; i ++){;}
     next_page_id = internal_page->page_id_array_[i-1];
     ///
@@ -138,7 +142,6 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t left_page, page_id_t right_page, KeyType right_key) -> bool {
-  //cout<<left_page<<" upinsert "<<right_page<<' '<<right_key<<" "<<" "<<left_page<<" "<<context->write_set_.empty()<<endl;
   if(context->write_set_.empty()){
     //当前为根节点
     page_id_t new_page_id = bpm_->NewPage();
@@ -165,8 +168,9 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
   auto up_page = up_page_guard.AsMut
         <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
   //获得context中的栈元素
-  
   int cur_size = up_page->GetSize();
+  cout<<"upinsert "<<up_page_guard.GetPageId()<<endl;
+
   if(cur_size == up_page->GetMaxSize()){
     //内部节点也已经满
       page_id_t new_internal_page_id = bpm_->NewPage();
@@ -180,6 +184,8 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
       int left_or_right = comparator_(right_key, up_page->key_array_[ceil]) > 0 ? 1 : 0;
       int in_the_mid = comparator_(right_key, up_page->key_array_[ceil+1]) < 0 ? 1 : 0;
       //必须在leftorright==1下成立
+
+
 
       int already_pushed = 0;
       for(; i < ceil + 1; i ++){
@@ -210,6 +216,7 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
         up_key = std::move(up_page->key_array_[i]);
         //将此键向上传
       }
+      cout<<"upkey"<<up_key<<endl;
       new_internal_page->ChangeSizeBy(i - left_or_right);
 
       if(left_or_right == 1 && in_the_mid == 1){
@@ -218,6 +225,7 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
 
       int start_point =  i + ((left_or_right==1&&in_the_mid==1)? 0 : 1);
       already_pushed = (left_or_right==1&&in_the_mid==1)? 1 : 0;
+      int mid_sub = (left_or_right==1&&in_the_mid==1)? 1 : 0;
       int j = start_point;
       for(; j <= cur_size; j++){
         if(left_or_right == 1 && already_pushed == 0 && comparator_(right_key, up_page->key_array_[j]) < 0){
@@ -231,8 +239,8 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
 
           already_pushed = 1;
         }
-        up_page->key_array_[j - start_point + already_pushed + 1] = std::move(up_page->key_array_[j]);
-        up_page->page_id_array_[j - start_point + 2*already_pushed] = up_page->page_id_array_[j + already_pushed - 1];
+        up_page->key_array_[j - start_point + already_pushed - mid_sub + 1] = std::move(up_page->key_array_[j]);
+        up_page->page_id_array_[j - start_point + 2*already_pushed - mid_sub] = up_page->page_id_array_[j + already_pushed - 1];
       }
 
       if(left_or_right==1&&already_pushed==0){
@@ -247,7 +255,14 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
 
       int sub = (left_or_right==1&&in_the_mid==1) ? 0 : 1;
       up_page->ChangeSizeBy(-(i-1) + left_or_right - sub);
-
+      for(int j = 1;j <= cur_size;j++){
+        cout<<up_page->key_array_[j]<<",";
+      }   
+      cout<<endl;   
+      for(int j = 1;j <= cur_size;j++){
+        cout<<up_page->page_id_array_[j-1]<<",";
+      }
+      cout<<endl;
       return UpInsert(context, new_internal_page_id,up_page_guard.GetPageId(), up_key);
   }
 
@@ -348,9 +363,20 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       leaf_page->ChangeSizeBy(-cur_size+ceil + 1-left_or_right);
 
       size_ ++;
-      cout<<"upinsert"<<leaf_page_id<<" "<<new_leaf_page_id<<" "<<new_leaf_page->key_array_[0]<<endl;
-      cout<<new_leaf_page->key_array_[0]<<" "<<new_leaf_page->key_array_[1]<<new_leaf_page->GetSize()<<endl;
-      cout<<leaf_page->key_array_[0]<<" "<<leaf_page->GetSize()<<endl;
+      // cout<<"upinsert"<<leaf_page_id<<" "<<new_leaf_page_id<<" "<<new_leaf_page->key_array_[0]<<endl;
+      // cout<<new_leaf_page->key_array_[0]<<" "<<new_leaf_page->key_array_[1]<<new_leaf_page->GetSize()<<endl;
+      // cout<<leaf_page->key_array_[0]<<" "<<leaf_page->GetSize()<<endl;
+      //cout<<"insertleaf "<<leaf_page_id<<" "<<new_leaf_page_id<<endl; 
+      
+      // for(int i = 0;i <= 2;i++){
+      //   cout<<leaf_page->key_array_[i]<<" ";
+      // }
+      // cout<<leaf_page->GetSize()<<endl;
+      // for(int i = 0;i <= 2;i++){
+      //   cout<<new_leaf_page->key_array_[i]<<" ";
+      // }
+      // cout<<new_leaf_page->GetSize()<<endl;
+      
       return UpInsert(context, leaf_page_id, new_leaf_page_id, new_leaf_page->key_array_[0]);
       //如果context中无内容就代表是根节点要替换根节点
     }
@@ -359,7 +385,7 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
     auto& key_array = leaf_page->key_array_;
     auto& rid_array = leaf_page->rid_array_;
     for(; i < cur_size && comparator_(key, key_array[i]) > 0; i ++) {;}
-    if(comparator_(key, key_array[i]) == 0){
+    if(comparator_(key, key_array[i]) == 0 && cur_size != 0){
       //二者等于
       return false;
     }

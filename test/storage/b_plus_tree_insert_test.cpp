@@ -100,8 +100,9 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   GenericKey<8> index_key;
   RID rid;
 
-  std::vector<int64_t> keys = {23, 27, 8, 0, 11, 20};
+  std::vector<int64_t> keys = {0,24,27,28};
   for (auto key : keys) {
+    cout<<"key"<<key<<endl;
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
@@ -112,7 +113,6 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   std::vector<RID> rids;
 
   for (auto key : keys) {
-    cout<<"key"<<key<<endl;
     rids.clear();
     index_key.SetFromInteger(key);
     is_present = tree.GetValue(index_key, &rids);
@@ -125,7 +125,7 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   }
   delete bpm;
 }
-TEST(BPlusTreeTests, DISABLED_RandomInsert) {
+TEST(BPlusTreeTests, RandomInsert) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
