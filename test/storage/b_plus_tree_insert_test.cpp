@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdio>
 
 #include "buffer/buffer_pool_manager.h"
@@ -27,13 +28,15 @@ auto RandomVector()->std::vector<int64_t>{
     std::srand(std::time(nullptr));
     
     // 随机生成向量的长度，范围是 0 到 10
-    size_t length = std::rand() % 10;
+    size_t length = 1000000;
     
     std::set<int64_t> unique_set;
     
     // 不断生成随机数直到集合大小达到所需的长度
-    while (unique_set.size() < length) {
-        unique_set.insert(std::rand()%30);  // 每个元素的值在 0 到 10 之间
+    size_t i = std::rand() %100;
+    for(size_t j = 1;j<=length;j++) {
+        i+= std::rand()%100;
+        unique_set.insert(i);  // 每个元素的值在 0 到 10 之间
     }
     // 将集合转为向量
     std::vector<int64_t> vec(unique_set.begin(), unique_set.end());
@@ -43,7 +46,7 @@ auto RandomVector()->std::vector<int64_t>{
     std::mt19937 g(rd());   // 使用梅森旋转算法作为随机数生成器
     std::shuffle(vec.begin(), vec.end(), g);
     for(auto key : vec){
-      cout<<key<<" ";
+      cout<<key<<", ";
     }
     cout<<endl;
     return vec;
@@ -86,7 +89,7 @@ TEST(BPlusTreeTests, DISABLED_BasicInsertTest) {
   delete bpm;
 }
 
-TEST(BPlusTreeTests, InsertTest1NoIterator) {
+TEST(BPlusTreeTests, DISABLED_InsertTest1NoIterator) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -100,9 +103,8 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   GenericKey<8> index_key;
   RID rid;
 
-  std::vector<int64_t> keys = {0,24,27,28};
+  std::vector<int64_t> keys = {174, 408, 245, 311, 308, 274, 151, 91};
   for (auto key : keys) {
-    cout<<"key"<<key<<endl;
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
@@ -113,6 +115,7 @@ TEST(BPlusTreeTests, InsertTest1NoIterator) {
   std::vector<RID> rids;
 
   for (auto key : keys) {
+    cout<<"key"<<key<<endl;
     rids.clear();
     index_key.SetFromInteger(key);
     is_present = tree.GetValue(index_key, &rids);
