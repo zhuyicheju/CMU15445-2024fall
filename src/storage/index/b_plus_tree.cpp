@@ -13,6 +13,7 @@
 #include "storage/index/b_plus_tree.h"
 #include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <memory>
 #include <utility>
 #include "common/config.h"
@@ -62,13 +63,27 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
     int size = leaf_page->GetSize();
     auto& key_array = leaf_page->key_array_;
     auto& rid_array = leaf_page->rid_array_;
-    for(int i = 0; i < size && comparator_(key, key_array[i]) >= 0; i ++) {
-      if(comparator_(key_array[i], key) == 0){
-        result->push_back(rid_array[i]);
-        return true;
-      }
+
+    auto iter = std::lower_bound(
+      key_array,
+      key_array + size,
+      key,
+      [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+    );
+
+    int i = std::distance(key_array , iter);  
+
+    if(comparator_(key_array[i], key) == 0){
+      result->push_back(rid_array[i]);
+      return true;
     }
     return false;
+    // for(int i = 0; i < size && comparator_(key, key_array[i]) >= 0; i ++) {
+    //   if(comparator_(key_array[i], key) == 0){
+    //     result->push_back(rid_array[i]);
+    //     return true;
+    //   }
+    // }
   }
 
   if(cur_page->IsInternalPage()){
@@ -76,13 +91,19 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
                         <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
     page_id_t next_page_id = INVALID_PAGE_ID;
     auto& key_array = internal_page->key_array_;
-    int i = 1;
     int cur_size = internal_page->GetSize();
-    // for(int j = 1;j <= cur_size;j++){
-    //   cout<<internal_page->key_array_[i]<<",";
-    // }
-    // cout<<endl;
-    for(; i <= cur_size && comparator_(key, key_array[i]) >= 0; i ++){;}
+
+    auto iter = std::upper_bound(
+      key_array + 1,
+      key_array + cur_size + 1,
+      key,
+      [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+    );
+
+    int i = std::distance(key_array , iter);
+
+    //for(; i <= cur_size && comparator_(key, key_array[i]) >= 0; i ++){;}
+    //原始查找算法
     next_page_id = internal_page->page_id_array_[i-1];
     ///
     /// 是否要释放PAGEGUARD
@@ -130,9 +151,20 @@ auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const
     auto internal_page = cur_page_guard.As
                         <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
     page_id_t next_page_id = INVALID_PAGE_ID;
-    int i = 1;
+    int cur_size = internal_page->GetSize();
+    //int i = 1;
     auto& key_array = internal_page->key_array_;
-    for(; i <= internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
+
+    auto iter = std::upper_bound(
+      key_array + 1,
+      key_array + cur_size + 1,
+      key,
+      [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+    );
+
+    int i = std::distance(key_array , iter);
+
+    //for(; i <= internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
     next_page_id = internal_page->page_id_array_[i-1];
 
     context->write_set_.push_front(std::move(cur_page_guard));
@@ -268,10 +300,19 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
       // cout<<up_page->page_id_array_[cur_size]<<endl;
 
 
-  int i = 1;
   auto& key_array = up_page->key_array_;
   auto& page_id_array = up_page->page_id_array_;
-  for(;i <= cur_size && comparator_(right_key, key_array[i]) >= 0;i++) {;}
+
+  auto iter = std::upper_bound(
+    key_array + 1,
+    key_array + cur_size + 1,
+    right_key,
+    [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+  );
+
+  int i = std::distance(key_array , iter);
+
+  //for(;i <= cur_size && comparator_(right_key, key_array[i]) >= 0;i++) {;}
   
   //将内部节点往后挪
   for(int j = cur_size + 1; j > i ;j --){
@@ -355,10 +396,20 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       already_pushed = 0;//没有用
 
       if(left_or_right == 0){
-        int j = 0;
+        //int j = 0;
         auto& key_array = leaf_page->key_array_;
         auto& rid_array = leaf_page->rid_array_;
-        for(; j < ceil && comparator_(key, key_array[j]) > 0; j ++) {;}
+
+        auto iter = std::upper_bound(
+          key_array,
+          key_array + ceil,
+          key,
+          [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+        );
+
+        int j = std::distance(key_array , iter);  
+
+        //for(; j < ceil && comparator_(key, key_array[j]) > 0; j ++) {;}
 
         //将i以后的键值对往后挪一格
         for(int k = ceil; k > j; k--){
@@ -380,11 +431,21 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
       //如果context中无内容就代表是根节点要替换根节点
     }
 
-    int i = 0;    
+    //int i = 0;    
     auto& key_array = leaf_page->key_array_;
     auto& rid_array = leaf_page->rid_array_;
-    for(; i < cur_size && comparator_(key, key_array[i]) > 0; i ++) {;}
-    if(comparator_(key, key_array[i]) == 0 && cur_size != 0){
+
+    auto iter = std::lower_bound(
+      key_array,
+      key_array + cur_size,
+      key,
+      [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+    );
+
+    int i = std::distance(key_array , iter);  
+
+    //for(; i < cur_size && comparator_(key, key_array[i]) > 0; i ++) {;}
+    if(cur_size != 0 && comparator_(key, key_array[i]) == 0){
       //二者等于
       return false;
     }
@@ -464,11 +525,20 @@ void BPLUSTREE_TYPE::RemoveLeaf(LeafPage* leaf_page, const KeyType &key, const s
   // if(cur_size <= leaf_page->GetMaxSize() / 2){
   //   //节点半满
   // }
-
-  int i = 0;    
+  
   auto& key_array = leaf_page->key_array_;
   auto& rid_array = leaf_page->rid_array_;
-  for(; i < cur_size && comparator_(key, key_array[i]) > 0; i ++) {;}
+  
+  auto iter = std::lower_bound(
+    key_array,
+    key_array + cur_size,
+    key,
+    [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+  );
+
+  int i = std::distance(key_array , iter);  
+
+  //for(; i < cur_size && comparator_(key, key_array[i]) > 0; i ++) {;}
   if(comparator_(key, key_array[i]) != 0){
     //无要删除键
     return;
@@ -508,9 +578,20 @@ void BPLUSTREE_TYPE::PageRemove(page_id_t cur_page_id, const KeyType& key,const 
     auto internal_page = cur_page_guard.As
                         <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
     page_id_t next_page_id = INVALID_PAGE_ID;
-    int i = 1;
+    int cur_size = internal_page->GetSize();
+    //int i = 1;
     auto& key_array = internal_page->key_array_;
-    for(; i <= internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
+
+    auto iter = std::upper_bound(
+      key_array + 1,
+      key_array + cur_size + 1,
+      key,
+      [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+    );
+
+    int i = std::distance(key_array , iter);  
+
+    //for(; i <= internal_page->GetSize() && comparator_(key, key_array[i]) >= 0; i ++){;}
     next_page_id = internal_page->page_id_array_[i-1];
 
     context->write_set_.push_front(std::move(cur_page_guard));
