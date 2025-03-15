@@ -15,6 +15,7 @@
 #include <cassert>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <utility>
 #include "common/config.h"
 #include "storage/index/b_plus_tree_debug.h"
@@ -50,7 +51,6 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return size_ == 0; }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::vector<ValueType> *result) const -> bool {
-  //cout<<"search"<<cur_page_id<<endl;
   if(cur_page_id == INVALID_PAGE_ID){
     return false;
   }
@@ -78,12 +78,6 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
       return true;
     }
     return false;
-    // for(int i = 0; i < size && comparator_(key, key_array[i]) >= 0; i ++) {
-    //   if(comparator_(key_array[i], key) == 0){
-    //     result->push_back(rid_array[i]);
-    //     return true;
-    //   }
-    // }
   }
 
   if(cur_page->IsInternalPage()){
@@ -105,9 +99,6 @@ auto BPLUSTREE_TYPE::PageSearch(page_id_t cur_page_id, const KeyType &key, std::
     //for(; i <= cur_size && comparator_(key, key_array[i]) >= 0; i ++){;}
     //原始查找算法
     next_page_id = internal_page->page_id_array_[i-1];
-    ///
-    /// 是否要释放PAGEGUARD
-    ///
     return PageSearch(next_page_id, key, result);
   }
   return false;
@@ -133,6 +124,56 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
   return PageSearch(header_page->root_page_id_, key, result);
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::KeyIterSearch(page_id_t cur_page_id, const KeyType &key) const 
+-> std::optional<std::pair<page_id_t, int>> {
+  if(cur_page_id == INVALID_PAGE_ID){
+    return std::nullopt;
+  }
+  ReadPageGuard cur_page_guard = bpm_->ReadPage(cur_page_id);
+  auto cur_page = cur_page_guard.As<BPlusTreePage>();
+  if(cur_page->IsLeafPage()){
+    auto leaf_page = cur_page_guard.As
+                      <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
+    int size = leaf_page->GetSize();
+    auto& key_array = leaf_page->key_array_;
+    auto iter = std::lower_bound(
+      key_array,
+      key_array + size,
+      key,
+      [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+    );
+    int i = std::distance(key_array , iter);  
+    if(comparator_(key_array[i], key) == 0){
+      return std::make_pair(cur_page_id, i);
+    }
+    return std::nullopt;
+  }
+  if(cur_page->IsInternalPage()){
+    auto internal_page = cur_page_guard.As
+                        <BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>();
+    page_id_t next_page_id = INVALID_PAGE_ID;
+    auto& key_array = internal_page->key_array_;
+    int cur_size = internal_page->GetSize();
+    auto iter = std::upper_bound(
+      key_array + 1,
+      key_array + cur_size + 1,
+      key,
+      [this](const KeyType& a, const KeyType& b) {return (comparator_(a, b) < 0 ? 1 : 0);}
+    );
+    int i = std::distance(key_array , iter);
+    next_page_id = internal_page->page_id_array_[i-1];
+    return KeyIterSearch(next_page_id, key);
+  }
+  return std::nullopt;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::GetKeyIter(const KeyType& key) -> std::optional<std::pair<page_id_t, int>> {
+  ReadPageGuard header_page_guard = bpm_->ReadPage(header_page_id_);
+  auto header_page = header_page_guard.As<BPlusTreeHeaderPage>();
+  return KeyIterSearch(header_page->root_page_id_, key);
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::PageInsert(page_id_t cur_page_id, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context) -> bool {
@@ -289,17 +330,6 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
   }
   //当前节点未满
 
-      // cout<<"NORMUpinsert "<<right_key<<" "<<left_page<<" "<<right_page<<endl;
-      // for(int i = 1;i<=cur_size;i++){
-      //   cout<<up_page->key_array_[i]<<",";
-      // }
-      // cout<<endl;
-      // for(int i = 1;i<=cur_size;i++){
-      //   cout<<up_page->page_id_array_[i-1]<<",";
-      // }
-      // cout<<up_page->page_id_array_[cur_size]<<endl;
-
-
   auto& key_array = up_page->key_array_;
   auto& page_id_array = up_page->page_id_array_;
 
@@ -326,15 +356,7 @@ auto BPLUSTREE_TYPE::UpInsert(const std::shared_ptr<Context>& context, page_id_t
 
   up_page->ChangeSizeBy(1);
       
-      cur_size+=1;
-      // for(int i = 1;i<=cur_size;i++){
-      //   cout<<up_page->key_array_[i]<<",";
-      // }
-      // cout<<endl;
-      // for(int i = 1;i<=cur_size;i++){
-      //   cout<<up_page->page_id_array_[i-1]<<",";
-      // }
-      // cout<<up_page->page_id_array_[cur_size]<<endl;
+  cur_size+=1;
   return true;
 }
 
@@ -358,11 +380,9 @@ auto BPLUSTREE_TYPE::InsertLeaf(LeafPage* leaf_page, const KeyType &key, const V
         <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
 
       new_leaf_page->Init(leaf_max_size_);
-      // new_leaf_page->next_page_id_ = leaf_page_id;
-      // if(first_leaf_page_id_ == leaf_page_id){
-      //   first_leaf_page_id_ = new_leaf_page_id;
-      // }
-      //设置迭代器的下一页
+      new_leaf_page->next_page_id_ = leaf_page->next_page_id_;
+      leaf_page->next_page_id_ = new_leaf_page_id;
+      //处理迭代器下一元素
 
       int i = 0;
       int ceil = cur_size / 2;
@@ -635,7 +655,7 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE { 
-  return INDEXITERATOR_TYPE();
+  return INDEXITERATOR_TYPE(first_leaf_page_id_, bpm_);
 }
 
 /**
@@ -644,7 +664,14 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
  * @return : index iterator
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE(); }
+auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE { 
+  auto pair_optional = GetKeyIter(key);
+  if(!pair_optional.has_value()){
+    return INDEXITERATOR_TYPE();
+  }
+  auto pair = pair_optional.value();
+  return INDEXITERATOR_TYPE(pair.first, pair.second, bpm_);
+}
 
 /**
  * @brief Input parameter is void, construct an index iterator representing the end
@@ -652,7 +679,9 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE { return IN
  * @return : index iterator
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE(); }
+auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE { 
+  return INDEXITERATOR_TYPE();
+}
 
 /**
  * @return Page id of the root of this tree

@@ -121,6 +121,11 @@ class BPlusTree {
  private:
   auto PageSearch(page_id_t cur_page, const KeyType &key, std::vector<ValueType> *result) const -> bool;
 
+  auto KeyIterSearch(page_id_t cur_page_id, const KeyType &key) const 
+  -> std::optional<std::pair<page_id_t, int>>; 
+
+  auto GetKeyIter(const KeyType& key) -> std::optional<std::pair<page_id_t, int>>;
+
   auto PageInsert(page_id_t cur_page, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context) -> bool;
 
   auto InsertLeaf(LeafPage* leafpage, const KeyType &key, const ValueType &value, std::shared_ptr<Context> context, page_id_t leaf_page_id) -> bool;

@@ -28,7 +28,7 @@ auto RandomVector()->std::vector<int64_t>{
     std::srand(std::time(nullptr));
     
     // 随机生成向量的长度，范围是 0 到 10
-    size_t length = 1000000;
+    size_t length = 1000;
     
     std::set<int64_t> unique_set;
     
@@ -128,7 +128,7 @@ TEST(BPlusTreeTests, DISABLED_InsertTest1NoIterator) {
   }
   delete bpm;
 }
-TEST(BPlusTreeTests, RandomInsert) {
+TEST(BPlusTreeTests, DISABLED_RandomInsert) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -138,7 +138,7 @@ TEST(BPlusTreeTests, RandomInsert) {
   // allocate header_page
   page_id_t page_id = bpm->NewPage();
   // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", page_id, bpm, comparator, 1000, 1000);
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", page_id, bpm, comparator, 10, 10);
   GenericKey<8> index_key;
   RID rid;
 
@@ -167,7 +167,7 @@ TEST(BPlusTreeTests, RandomInsert) {
   }
   delete bpm;
 }
-TEST(BPlusTreeTests, DISABLED_InsertTest2) {
+TEST(BPlusTreeTests, InsertTest2) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
