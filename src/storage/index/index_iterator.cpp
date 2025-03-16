@@ -75,7 +75,6 @@ auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
     auto leaf_page = page_guard_.As
             <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();    
     page_id_ = leaf_page->next_page_id_;
-    page_guard_.Drop();
     if(page_id_ != INVALID_PAGE_ID){
       page_guard_ = bpm_->ReadPage(page_id_);
       leaf_page = page_guard_.As

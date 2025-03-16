@@ -451,7 +451,7 @@ TEST(BPlusTreeConcurrentTest, DISABLED_InsertTest2) {  // NOLINT
   InsertTest2Call();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_DeleteTest1) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, DeleteTest1) {  // NOLINT
   DeleteTest1Call();
 }
 

@@ -23,10 +23,13 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <deque>
 #include <filesystem>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <queue>
 #include <shared_mutex>
@@ -119,9 +122,9 @@ class BPlusTree {
   void BatchOpsFromFile(const std::filesystem::path &file_name);
 
  private:
-  auto PageSearch(page_id_t cur_page, const KeyType &key, std::vector<ValueType> *result) const -> bool;
+  auto PageSearch(page_id_t cur_page, const KeyType &key, std::vector<ValueType> *result, const std::shared_ptr<Context>& context) const -> bool;
 
-  auto KeyIterSearch(page_id_t cur_page_id, const KeyType &key) const 
+  auto KeyIterSearch(page_id_t cur_page_id, const KeyType &key, const std::shared_ptr<Context>& context) const 
   -> std::optional<std::pair<page_id_t, int>>; 
 
   auto GetKeyIter(const KeyType& key) -> std::optional<std::pair<page_id_t, int>>;
@@ -151,7 +154,7 @@ class BPlusTree {
   int internal_max_size_;
   page_id_t header_page_id_;
 
-  size_t size_{0};
+  std::atomic<int> size_{0};
 
   page_id_t first_leaf_page_id_;
 };
