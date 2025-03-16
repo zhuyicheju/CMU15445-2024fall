@@ -565,7 +565,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::RemoveLeaf(LeafPage* leaf_page, const KeyType &key, const std::shared_ptr<Context>& context, page_id_t leaf_page_id)  {
   int cur_size = leaf_page->GetSize();
-  
+
   auto& key_array = leaf_page->key_array_;
   auto& rid_array = leaf_page->rid_array_;
   
@@ -578,7 +578,7 @@ void BPLUSTREE_TYPE::RemoveLeaf(LeafPage* leaf_page, const KeyType &key, const s
 
   int i = std::distance(key_array , iter);  
 
-  if(comparator_(key, key_array[i]) != 0){
+  if(i >= cur_size || comparator_(key, key_array[i]) != 0){
     //无要删除键
     return;
   }
@@ -589,9 +589,7 @@ void BPLUSTREE_TYPE::RemoveLeaf(LeafPage* leaf_page, const KeyType &key, const s
     key_array[j] = key_array[j+1];
     rid_array[j] = std::move(rid_array[j+1]);
   }
-
   leaf_page->ChangeSizeBy(-1);
-  
   size_--;
   // if(size_ == 0){
   //   context->header_page_.value().AsMut<BPlusTreeHeaderPage>()->root_page_id_ = INVALID_PAGE_ID;
@@ -680,8 +678,23 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key) {
  * @return : index iterator
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE { 
-  return INDEXITERATOR_TYPE(first_leaf_page_id_, bpm_);
+auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
+  if(first_leaf_page_id_ == INVALID_PAGE_ID){
+    return INDEXITERATOR_TYPE();
+  }
+  ReadPageGuard leaf_page_guard = bpm_->ReadPage(first_leaf_page_id_);
+  auto leaf_page = leaf_page_guard.As<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
+  page_id_t page_id = first_leaf_page_id_;
+  while(leaf_page->GetSize() == 0){
+    page_id = leaf_page->next_page_id_;
+    if(page_id == INVALID_PAGE_ID){
+      return INDEXITERATOR_TYPE();
+    }
+    leaf_page_guard = bpm_->ReadPage(page_id);
+    leaf_page = leaf_page_guard.As<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
+  }
+
+  return INDEXITERATOR_TYPE(page_id, bpm_);
 }
 
 /**

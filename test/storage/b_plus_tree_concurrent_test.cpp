@@ -250,6 +250,7 @@ void DeleteTest1Call() {
     std::vector<int64_t> remove_keys = {1, 5, 3, 4};
     LaunchParallelTest(2, DeleteHelper, &tree, remove_keys);
 
+
     int64_t start_key = 2;
     int64_t current_key = start_key;
     int64_t size = 0;
