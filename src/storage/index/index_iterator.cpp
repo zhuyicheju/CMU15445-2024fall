@@ -80,6 +80,18 @@ auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
       leaf_page = page_guard_.As
             <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();   
       page_size_ = leaf_page->GetSize();
+      while(page_size_ == 0){
+        page_id_ = leaf_page->next_page_id_;
+        if(page_id_ == INVALID_PAGE_ID){
+          page_guard_.Drop();
+          break;
+        }
+        page_guard_ = bpm_->ReadPage(page_id_);
+        leaf_page = page_guard_.As<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
+        page_size_ = leaf_page->GetSize();
+      }
+    }else{
+      page_guard_.Drop();
     }
     page_idx_ = 0;
   }

@@ -23,6 +23,7 @@
 #include "storage/index/b_plus_tree.h"
 #include "test_util.h"  // NOLINT
 
+using std::cout, std::endl;
 namespace bustub {
 
 using bustub::DiskManagerUnlimitedMemory;
