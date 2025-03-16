@@ -19,7 +19,7 @@
 #include "buffer/buffer_pool_manager.h"
 #include "common/config.h"
 #include "storage/index/index_iterator.h"
-
+using std::cout, std::endl;
 namespace bustub {
 
 /**
@@ -28,7 +28,7 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::IndexIterator():
-  page_id_(INVALID_PAGE_ID)
+  page_id_(INVALID_PAGE_ID), page_idx_(0)
 {}
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -39,6 +39,8 @@ INDEXITERATOR_TYPE::IndexIterator(page_id_t page_id, BufferPoolManager* bpm):
   page_id_(page_id), page_idx_(0), bpm_(bpm)
 {
   page_guard_ = bpm_->ReadPage(page_id);
+  page_size_ = page_guard_.As
+    <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>()->GetSize();
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -46,6 +48,8 @@ INDEXITERATOR_TYPE::IndexIterator(page_id_t page_id, int idx, BufferPoolManager*
   page_id_(page_id), page_idx_(idx), bpm_(bpm)
 {
   page_guard_ = bpm_->ReadPage(page_id);
+  page_size_ = page_guard_.As
+    <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>()->GetSize();
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -64,6 +68,9 @@ auto INDEXITERATOR_TYPE::operator*() -> std::pair<const KeyType &, const ValueTy
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & { 
+  if(page_id_ == INVALID_PAGE_ID){
+    return *this;
+  }
   if(++page_idx_ >= page_size_){
     auto leaf_page = page_guard_.As
             <BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();    

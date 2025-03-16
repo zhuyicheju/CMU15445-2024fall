@@ -512,7 +512,6 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
     root_page_id = bpm_->NewPage();
     header_page->root_page_id_ = root_page_id;
     first_leaf_page_id_ = root_page_id;
-    //header_guard.Drop();
     WritePageGuard root_page_guard = bpm_->WritePage(root_page_id);
     auto root_page = root_page_guard.AsMut<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>();
     root_page->Init(leaf_max_size_);
@@ -527,16 +526,6 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
   context->root_page_id_ = root_page_id;
 
   return PageInsert(root_page_id, key, value, context);
-  // WritePageGuard root_guard = bpm_->WritePage(root_page_id);
-  // auto root_page = root_guard.AsMut<BPlusTreePage>();
-
-  // if(root_page->IsLeafPage()){
-  //   auto leaf_page = root_guard.AsMut<LeafPage>();
-  //   return InsertLeaf(leaf_page, key, value);
-  // }
-  // if(root_page->IsInternalPage()){
-  //   //内部节点向下遍历
-  // }
 }
 
 INDEX_TEMPLATE_ARGUMENTS
